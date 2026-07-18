@@ -9,6 +9,7 @@ class Settings(BaseSettings):
     # Supabase Credentials
     SUPABASE_URL: str = Field(default="http://127.0.0.1:54321", validation_alias="SUPABASE_URL")
     SUPABASE_KEY: str = Field(default="dev-key", validation_alias="SUPABASE_KEY")
+    SUPABASE_SERVICE_ROLE_KEY: str = Field(default="", validation_alias="SUPABASE_SERVICE_ROLE_KEY")
     SUPABASE_JWT_SECRET: str = Field(default="dev-jwt-secret", validation_alias="SUPABASE_JWT_SECRET")
 
     # Auth configuration
@@ -24,3 +25,7 @@ class Settings(BaseSettings):
     )
 
 settings = Settings()
+
+
+def get_supabase_key() -> str:
+    return settings.SUPABASE_SERVICE_ROLE_KEY or settings.SUPABASE_KEY

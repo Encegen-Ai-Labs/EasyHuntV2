@@ -1,11 +1,11 @@
 from typing import Dict, Any, List, Optional
 from supabase import Client, create_client
-from app.core.config import settings
+from app.core.config import get_supabase_key, settings
 
 class BaseRepository:
     def __init__(self, supabase_client: Optional[Client] = None):
         # Allow client injection, fallback to global settings
-        self.client: Client = supabase_client or create_client(settings.SUPABASE_URL, settings.SUPABASE_KEY)
+        self.client: Client = supabase_client or create_client(settings.SUPABASE_URL, get_supabase_key())
 
     def select(self, table: str, query_filters: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
         builder = self.client.table(table).select("*")

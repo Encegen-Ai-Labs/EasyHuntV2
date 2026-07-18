@@ -12,7 +12,7 @@ class RoleEnum(str, Enum):
 class UserRegister(BaseModel):
     email: EmailStr
     password: str = Field(..., min_length=8)
-    full_name: str
+    organisation_name: str
     role: RoleEnum = RoleEnum.Vendor
 
 class UserLogin(BaseModel):
@@ -26,9 +26,8 @@ class Token(BaseModel):
 class UserResponse(BaseModel):
     id: UUID
     email: EmailStr
-    full_name: str
+    organisation_name: str
     role: RoleEnum
-    is_active: bool
     created_at: datetime
 
     class Config:

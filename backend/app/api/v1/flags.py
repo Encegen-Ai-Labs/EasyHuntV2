@@ -6,18 +6,20 @@ from app.schemas.flags import FlagCreate, FlagResponse, FlagResolve, FlagStatusE
 from app.repositories.flag_repo import FlagRepository
 from app.services.review_service import ReviewService
 from app.repositories.case_repo import CaseRepository
-from app.dependencies.db import get_supabase_client
+from app.dependencies.db import get_supabase_client, get_supabase_service_client
 from app.dependencies.auth import get_current_user, RoleRequirement
 from app.core.exceptions import ResourceNotFoundError, PermissionDeniedError
 from supabase import Client
 
 router = APIRouter(prefix="/flags", tags=["Flags Auditing & Automation"])
 
-def get_flag_repository(db: Client = Depends(get_supabase_client)) -> FlagRepository:
-    return FlagRepository(db)
 
 def get_flag_repository(db: Client = Depends(get_supabase_service_client)) -> FlagRepository:
     return FlagRepository(db)
+
+
+def get_review_service(db: Client = Depends(get_supabase_service_client)) -> ReviewService:
+    return ReviewService(CaseRepository(db), FlagRepository(db))
 
 @router.get("", response_model=List[FlagResponse])
 def list_flags(

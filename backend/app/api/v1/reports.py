@@ -1,13 +1,16 @@
+from typing import Any, Dict
+
 from fastapi import APIRouter, Depends, status
-from app.services.report_service import ReportGenerationService
+from supabase import Client
+
+from app.dependencies.auth import RoleRequirement, get_current_user
+from app.dependencies.db import get_supabase_client, get_supabase_service_client
 from app.repositories.case_repo import CaseRepository
 from app.repositories.report_repo import ReportRepository
-from app.dependencies.db import get_supabase_client
-from app.dependencies.auth import get_current_user, RoleRequirement
-from supabase import Client
-from typing import Dict, Any
+from app.services.report_service import ReportGenerationService
 
 router = APIRouter(prefix="/reports", tags=["Reports Hub"])
+
 
 def get_report_repository(db: Client = Depends(get_supabase_service_client)) -> ReportRepository:
     return ReportRepository(db)

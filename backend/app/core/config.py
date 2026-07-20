@@ -1,4 +1,3 @@
-import os
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import Field
 
@@ -15,8 +14,8 @@ class Settings(BaseSettings):
     # Auth configuration
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
     ALGORITHM: str = "HS256"
-    ADMIN_EMAIL: str = os.getenv("ADMIN_EMAIL")
-    ADMIN_PASSWORD: str = os.getenv("ADMIN_PASSWORD")
+    ADMIN_EMAIL: str = Field(default="", validation_alias="ADMIN_EMAIL")
+    ADMIN_PASSWORD: str = Field(default="", validation_alias="ADMIN_PASSWORD")
 
     model_config = SettingsConfigDict(
         env_file=".env",

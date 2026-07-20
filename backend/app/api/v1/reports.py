@@ -15,6 +15,10 @@ router = APIRouter(prefix="/reports", tags=["Reports Hub"])
 def get_report_repository(db: Client = Depends(get_supabase_service_client)) -> ReportRepository:
     return ReportRepository(db)
 
+
+def get_report_service(db: Client = Depends(get_supabase_service_client)) -> ReportGenerationService:
+    return ReportGenerationService(CaseRepository(db), ReportRepository(db))
+
 @router.post("/generate/{case_id}", status_code=status.HTTP_201_CREATED)
 def generate_report(
     case_id: str,

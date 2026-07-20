@@ -35,7 +35,7 @@ class PipelineService:
             "chain": [
                 {"order": 1, "owner": "John Doe", "date": "2020-01-15", "type": "Sale Deed", "survey": "404-A"},
                 {"order": 2, "owner": "Alice Smith", "date": "2022-05-10", "type": "Sale Deed", "survey": "404-A"},
-                {"order": 3, "owner": "Bob Miller", "date": "2025-11-20", "type": "Sale Deed", "survey": "404-B"} -- Potential mismatch
+                {"order": 3, "owner": "Bob Miller", "date": "2025-11-20", "type": "Sale Deed", "survey": "404-B"}
             ]
         }
         validated_json = raw_json.copy()

@@ -1,4 +1,13 @@
-export default function Input({ label, type = "text", name, value, onChange, error }) {
+type InputProps = {
+  label: string;
+  type?: string;
+  name: string;
+  value: string;
+  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  error?: string;
+};
+
+export default function Input({ label, type = "text", name, value, onChange, error }: InputProps) {
   return (
     <div className="mb-4">
       <label htmlFor={name} className="block text-sm font-medium text-gray-700 mb-1">

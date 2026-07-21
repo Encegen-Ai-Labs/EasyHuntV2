@@ -3,79 +3,54 @@
 import { useState } from "react";
 import Link from "next/link";
 import Input from "@/components/ui/Input";
-import { signup } from "@/lib/mockApi";
+import { login } from "@/lib/mockApi";
 
-export default function SignupPage() {
-  const [form, setForm] = useState({
-    name: "",
-    email: "",
-    password: "",
-    confirmPassword: "",
-    phone: "",
-  });
-  const [errors, setErrors] = useState({});
+export default function LoginPage() {
+  const [form, setForm] = useState({ email: "", password: "" });
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
 
-  function handleChange(e) {
+  function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
     const { name, value } = e.target;
     setForm((prev) => ({ ...prev, [name]: value }));
   }
 
-  function validate() {
-    const next = {};
-
-    if (!form.name.trim()) {
-      next.name = "Name is required";
-    }
-
+  function validate(): Record<string, string> {
+    const next: Record<string, string> = {};
     if (!form.email.trim()) {
       next.email = "Email is required";
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) {
       next.email = "Enter a valid email address";
     }
-
     if (!form.password) {
       next.password = "Password is required";
-    } else if (form.password.length < 8) {
-      next.password = "Password must be at least 8 characters";
     }
-
-    if (form.password !== form.confirmPassword) {
-      next.confirmPassword = "Passwords do not match";
-    }
-
-    if (form.phone && !/^[0-9+\-\s()]{7,15}$/.test(form.phone)) {
-      next.phone = "Enter a valid phone number";
-    }
-
     return next;
   }
 
-  async function handleSubmit(e) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const found = validate();
     setErrors(found);
-
     if (Object.keys(found).length > 0) return;
 
     setLoading(true);
-    const result = await signup(form);
+    const result = await login(form.email, form.password);
     setLoading(false);
 
     if (!result.success) {
-      setErrors({ form: result.error });
+      setErrors({ form: result.error ?? "Login failed" });
       return;
     }
-
-    console.log("Signed up:", result.user);
+    console.log("Logged in:", result.user);
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4 py-8">
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
       <div className="w-full max-w-md bg-white p-8 rounded-lg shadow">
-        <h1 className="text-2xl font-bold mb-1">Create an account</h1>
+        <h1 className="text-2xl font-bold mb-1">Sign in</h1>
         <p className="text-sm text-gray-500 mb-6">
-          Start running property due diligence in minutes
+          Access your property due diligence cases
         </p>
 
         {errors.form && (
@@ -85,13 +60,6 @@ export default function SignupPage() {
         )}
 
         <form onSubmit={handleSubmit} noValidate>
-          <Input
-            label="Full name"
-            name="name"
-            value={form.name}
-            onChange={handleChange}
-            error={errors.name}
-          />
           <Input
             label="Email"
             name="email"
@@ -108,29 +76,12 @@ export default function SignupPage() {
             onChange={handleChange}
             error={errors.password}
           />
-          <Input
-            label="Confirm password"
-            name="confirmPassword"
-            type="password"
-            value={form.confirmPassword}
-            onChange={handleChange}
-            error={errors.confirmPassword}
-          />
-          <Input
-            label="Phone (optional)"
-            name="phone"
-            type="tel"
-            value={form.phone}
-            onChange={handleChange}
-            error={errors.phone}
-          />
-
           <button
             type="submit"
             disabled={loading}
             className="w-full bg-blue-600 text-white py-2 rounded-md hover:bg-blue-700 disabled:opacity-50"
           >
-            {loading ? "Creating account..." : "Create account"}
+            {loading ? "Signing in..." : "Sign in"}
           </button>
         </form>
 
@@ -149,9 +100,9 @@ export default function SignupPage() {
         </button>
 
         <p className="mt-6 text-center text-sm text-gray-600">
-          Already have an account?{" "}
-          <Link href="/login" className="text-blue-600 hover:underline">
-            Sign in
+          Don&apos;t have an account?{" "}
+          <Link href="/signup" className="text-blue-600 hover:underline">
+            Sign up
           </Link>
         </p>
       </div>

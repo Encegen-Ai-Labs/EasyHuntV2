@@ -1,5 +1,6 @@
 from pydantic import BaseModel
 from enum import Enum
+from typing import Optional
 from uuid import UUID
 from datetime import datetime
 
@@ -22,6 +23,7 @@ class DocumentResponse(BaseModel):
     mime_type: str
     status: DocStatusEnum
     created_at: datetime
+    uploaded_by: Optional[UUID] = None
 
     class Config:
         from_attributes = True

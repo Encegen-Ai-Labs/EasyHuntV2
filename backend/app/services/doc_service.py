@@ -3,7 +3,7 @@ from typing import Dict, Any
 from app.repositories.doc_repo import DocumentRepository
 from app.repositories.case_repo import CaseRepository
 from app.core.exceptions import ResourceNotFoundError, PermissionDeniedError, PropertySystemException
-
+from datetime import datetime, timezone
 ALLOWED_MIMETYPES = ["application/pdf", "image/png", "image/jpeg", "image/jpg"]
 MAX_FILE_SIZE = 10 * 1024 * 1024  # 10 MB
 
@@ -25,9 +25,8 @@ class DocumentService:
         if not case_obj:
             raise ResourceNotFoundError("Target case does not exist")
         
-        if current_user["role"] == "Vendor" and case_obj["vendor_id"] != current_user["id"]:
-            raise PermissionDeniedError("Cannot upload documents to cases you do not own")
-
+        if current_user["role"] == "Vendor" and case_obj.get("created_by") != current_user["id"]:
+            raise PermissionDeniedError("You can only upload documents for your own cases")
         # Validate file properties
         file_size = len(file_bytes)
         if file_size > MAX_FILE_SIZE:
@@ -51,6 +50,8 @@ class DocumentService:
             "file_path": storage_path,
             "file_size": file_size,
             "mime_type": mime_type,
-            "status": "uploaded"
+            "status": "uploaded",
+            "uploaded_by": current_user["id"],
+            "created_at": datetime.now(timezone.utc).isoformat()
         }
         return self.doc_repo.create_document(doc_payload)

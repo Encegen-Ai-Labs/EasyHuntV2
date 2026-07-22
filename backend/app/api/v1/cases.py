@@ -20,8 +20,9 @@ def create_case(
 ):
     return service.create(
         vendor_id=str(current_user["id"]),
-        property_address=payload.property_address,
-        survey_number=payload.survey_number
+        property_name=payload.property_name,
+        survey_number=payload.survey_number,
+        location=payload.location
     )
 
 @router.get("", response_model=List[CaseResponse])

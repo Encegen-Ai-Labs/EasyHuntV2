@@ -13,49 +13,42 @@ export default function SignupPage() {
     confirmPassword: "",
     phone: "",
   });
-  const [errors, setErrors] = useState({});
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
 
-  function handleChange(e) {
+  function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
     const { name, value } = e.target;
     setForm((prev) => ({ ...prev, [name]: value }));
   }
 
-  function validate() {
-    const next = {};
-
+  function validate(): Record<string, string> {
+    const next: Record<string, string> = {};
     if (!form.name.trim()) {
       next.name = "Name is required";
     }
-
     if (!form.email.trim()) {
       next.email = "Email is required";
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) {
       next.email = "Enter a valid email address";
     }
-
     if (!form.password) {
       next.password = "Password is required";
     } else if (form.password.length < 8) {
       next.password = "Password must be at least 8 characters";
     }
-
     if (form.password !== form.confirmPassword) {
       next.confirmPassword = "Passwords do not match";
     }
-
     if (form.phone && !/^[0-9+\-\s()]{7,15}$/.test(form.phone)) {
       next.phone = "Enter a valid phone number";
     }
-
     return next;
   }
 
-  async function handleSubmit(e) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const found = validate();
     setErrors(found);
-
     if (Object.keys(found).length > 0) return;
 
     setLoading(true);
@@ -63,10 +56,9 @@ export default function SignupPage() {
     setLoading(false);
 
     if (!result.success) {
-      setErrors({ form: result.error });
+      setErrors({ form: "Signup failed" });
       return;
     }
-
     console.log("Signed up:", result.user);
   }
 
@@ -124,7 +116,6 @@ export default function SignupPage() {
             onChange={handleChange}
             error={errors.phone}
           />
-
           <button
             type="submit"
             disabled={loading}

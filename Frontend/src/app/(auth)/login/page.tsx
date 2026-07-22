@@ -7,35 +7,31 @@ import { login } from "@/lib/mockApi";
 
 export default function LoginPage() {
   const [form, setForm] = useState({ email: "", password: "" });
-  const [errors, setErrors] = useState({});
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
 
-  function handleChange(e) {
+  function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
     const { name, value } = e.target;
     setForm((prev) => ({ ...prev, [name]: value }));
   }
 
-  function validate() {
-    const next = {};
-
+  function validate(): Record<string, string> {
+    const next: Record<string, string> = {};
     if (!form.email.trim()) {
       next.email = "Email is required";
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) {
       next.email = "Enter a valid email address";
     }
-
     if (!form.password) {
       next.password = "Password is required";
     }
-
     return next;
   }
 
-  async function handleSubmit(e) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const found = validate();
     setErrors(found);
-
     if (Object.keys(found).length > 0) return;
 
     setLoading(true);
@@ -43,10 +39,9 @@ export default function LoginPage() {
     setLoading(false);
 
     if (!result.success) {
-      setErrors({ form: result.error });
+      setErrors({ form: result.error ?? "Login failed" });
       return;
     }
-
     console.log("Logged in:", result.user);
   }
 
@@ -81,7 +76,6 @@ export default function LoginPage() {
             onChange={handleChange}
             error={errors.password}
           />
-
           <button
             type="submit"
             disabled={loading}

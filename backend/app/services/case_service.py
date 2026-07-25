@@ -1,4 +1,5 @@
-from typing import List, Dict, Any, Optional
+from datetime import datetime, timezone
+from typing import Dict, Any, List, Optional
 from app.repositories.case_repo import CaseRepository
 from app.core.exceptions import ResourceNotFoundError, PermissionDeniedError
 
@@ -6,12 +7,23 @@ class CaseService:
     def __init__(self, case_repo: CaseRepository):
         self.case_repo = case_repo
 
-    def create(self, vendor_id: str, property_address: str, survey_number: str) -> Dict[str, Any]:
+    def create(
+        self, 
+        vendor_id: str, 
+        property_name: str, 
+        survey_number: str, 
+        location: Optional[str] = None
+    ) -> Dict[str, Any]:
+        now = datetime.now(timezone.utc).isoformat()
+        
         payload = {
-            "vendor_id": vendor_id,
-            "property_address": property_address,
+            "created_by": vendor_id,
+            "property_name": property_name,
             "survey_number": survey_number,
-            "status": "open"
+            "location": location,
+            "status": "open",
+            "created_at": now,
+            "updated_at": now
         }
         return self.case_repo.create_case(payload)
 
@@ -20,8 +32,7 @@ class CaseService:
         if not case_item:
             raise ResourceNotFoundError("Case not found")
         
-        # Enforce multi-tenant access boundaries
-        if current_user["role"] == "Vendor" and case_item["vendor_id"] != current_user["id"]:
+        if current_user["role"] == "Vendor" and case_item.get("created_by") != current_user["id"]:
             raise PermissionDeniedError("You can only access your own cases")
         return case_item
 

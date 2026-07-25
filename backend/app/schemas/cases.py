@@ -1,6 +1,6 @@
 from pydantic import BaseModel
 from enum import Enum
-from typing import Optional, List
+from typing import Optional
 from uuid import UUID
 from datetime import datetime
 
@@ -11,24 +11,25 @@ class CaseStatusEnum(str, Enum):
     completed = "completed"
 
 class CaseCreate(BaseModel):
-    property_address: str
+    property_name: str
     survey_number: str
+    location: Optional[str] = None  # Accepted in POST request payload
 
 class CaseUpdate(BaseModel):
-    property_address: Optional[str] = None
+    property_name: Optional[str] = None
     survey_number: Optional[str] = None
+    location: Optional[str] = None
     status: Optional[CaseStatusEnum] = None
-    reviewer_id: Optional[UUID] = None
 
 class CaseResponse(BaseModel):
     id: UUID
-    vendor_id: UUID
-    reviewer_id: Optional[UUID] = None
-    property_address: str
+    created_by: UUID
+    property_name: str
     survey_number: str
+    location: Optional[str] = None
     status: CaseStatusEnum
-    created_at: datetime
-    updated_at: datetime
+    created_at: Optional[datetime] = None  # Now handles null/missing timestamps safely
+    updated_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True

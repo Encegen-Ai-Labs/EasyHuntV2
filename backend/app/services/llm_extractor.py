@@ -1,4 +1,4 @@
-from google import genai
+﻿from google import genai
 from google.genai import types
 import json
 import os
@@ -65,7 +65,7 @@ def extract_from_image_path(image_path: str) -> Dict[str, Any]:
             image_bytes = f.read()
 
         response = client_genai.models.generate_content(
-            model="gemini-2.0-flash",
+            model="gemini-3.5-flash-lite",
             contents=[
                 types.Part.from_bytes(
                     data=image_bytes,
@@ -83,7 +83,7 @@ def extract_from_image_path(image_path: str) -> Dict[str, Any]:
             "success": True,
             "raw_output": raw_output,
             "extracted": extracted,
-            "model_used": "gemini-2.0-flash",
+            "model_used": "gemini-3.5-flash-lite",
             "error": None
         }
 
@@ -92,7 +92,7 @@ def extract_from_image_path(image_path: str) -> Dict[str, Any]:
             "success": False,
             "raw_output": raw_output,
             "extracted": None,
-            "model_used": "gemini-2.0-flash",
+            "model_used": "gemini-3.5-flash-lite",
             "error": "Model returned invalid JSON"
         }
     except Exception as e:
@@ -100,7 +100,7 @@ def extract_from_image_path(image_path: str) -> Dict[str, Any]:
             "success": False,
             "raw_output": None,
             "extracted": None,
-            "model_used": "gemini-2.0-flash",
+            "model_used": "gemini-3.5-flash-lite",
             "error": str(e)
         }
 
@@ -129,6 +129,6 @@ def extract_from_supabase_url(file_url: str) -> Dict[str, Any]:
             "success": False,
             "raw_output": None,
             "extracted": None,
-            "model_used": "gemini-2.0-flash",
+            "model_used": "gemini-3.5-flash-lite",
             "error": str(e)
         }

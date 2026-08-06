@@ -83,7 +83,10 @@ def extract_from_image_path(image_path: str) -> Dict[str, Any]:
                     mime_type="image/jpeg"
                 ),
                 EXTRACTION_PROMPT
-            ]
+            ],
+            config=types.GenerateContentConfig(
+                temperature=0.0
+            )
         )
 
         raw_output = response.text

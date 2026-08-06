@@ -1,10 +1,11 @@
-import json
 from typing import Dict, Any
 from app.repositories.doc_repo import DocumentRepository
 from app.repositories.case_repo import CaseRepository
 from app.repositories.flag_repo import FlagRepository
 from app.repositories.base import BaseRepository
 from app.services.llm_extractor import extract_from_supabase_url
+from app.services.validation import validate_extraction
+
 
 class PipelineService:
     def __init__(
@@ -27,7 +28,6 @@ class PipelineService:
         self.case_repo.update_case(case_id, {"status": "processing"})
 
         # Step 1 & 2: Real LLM extraction via Gemini
-        # get signed url from supabase storage to pass to gemini
         file_url = self.generic_repo.client.storage.from_(
             "property-documents"
         ).create_signed_url(doc["file_path"], 300)["signedURL"]
@@ -47,6 +47,9 @@ class PipelineService:
         raw_json = extracted
         validated_json = extracted
 
+        # Run validation — includes handwriting override rule
+        validation_result = validate_extraction(extracted)
+
         extraction_payload = {
             "document_id": doc_id,
             "raw_ocr_text": result["raw_output"],
@@ -56,12 +59,20 @@ class PipelineService:
                 "high": 95.0,
                 "medium": 70.0,
                 "low": 40.0
-            }.get(extracted.get("confidence", "low"), 40.0),
-            "model_used": result["model_used"]
+            }.get(extracted.get("overall_confidence", "low"), 40.0),
+            "model_used": result["model_used"],
+            "validation_errors": validation_result["errors"] + validation_result["warnings"],
+            "needs_review": validation_result["needs_human_review"],
+            "has_handwritten_content": extracted.get("has_handwritten_content", True)
         }
 
         self.generic_repo.insert("extractions", extraction_payload)
-        self.doc_repo.update_status(doc_id, "llm_done")
+
+        # Route based on validation instead of always going to under_review
+        if validation_result["needs_human_review"]:
+            self.doc_repo.update_status(doc_id, "flagged")
+        else:
+            self.doc_repo.update_status(doc_id, "llm_done")
 
         # Step 3: Populate Ownership Chain Records
         chain = extracted.get("chain", [])
@@ -87,13 +98,23 @@ class PipelineService:
                     "status": "raised"
                 })
 
+        # Flag handwritten content explicitly too, so it shows up in the case's flag list
+        if extracted.get("has_handwritten_content", True):
+            self.flag_repo.create_flag({
+                "case_id": case_id,
+                "flag_type": "Handwritten Content Detected",
+                "severity": "medium",
+                "description": "Document contains handwritten text — requires human verification regardless of AI confidence",
+                "status": "raised"
+            })
+
         # Finalize
-        self.doc_repo.update_status(doc_id, "under_review")
         self.case_repo.update_case(case_id, {"status": "review"})
 
         return {
             "status": "success",
             "case_id": case_id,
             "document_id": doc_id,
-            "extracted": extracted
+            "extracted": extracted,
+            "needs_review": validation_result["needs_human_review"]
         }

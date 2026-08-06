@@ -1,4 +1,4 @@
-from google import genai
+﻿from google import genai
 from google.genai import types
 import json
 import os
@@ -12,21 +12,29 @@ client_genai = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
 EXTRACTION_PROMPT = """You are an expert at reading Indian property documents including handwritten text in Hindi, Marathi, Tamil, Telugu, Kannada and other Indian regional languages.
 
-Extract the following fields from this property document image and return ONLY a valid JSON object. No explanation, no preamble, no markdown backticks, just raw JSON.
+First, transcribe the ENTIRE document text verbatim, exactly as written, in its original script. Do not translate. Do not correct spelling. If a word or character is genuinely illegible, write [illegible] at that point rather than guessing.
+
+Then extract the following fields and return ONLY a valid JSON object. No explanation, no preamble, no markdown backticks, just raw JSON.
 
 {
-  "document_type": "sale_deed | mutation_record | tax_receipt | encumbrance_certificate | other",
+  "full_text": "complete verbatim transcription of the entire document in original script and language, preserving line breaks where meaningful, using [illegible] for unclear portions",
+  "document_type": "sale_deed | mutation_record | tax_receipt | encumbrance_certificate | partition_deed | gift_deed | other",
   "owner_name": "full name of current owner or null",
-  "previous_owner_name": "full name of previous owner or null",
+  "owner_name_confidence": "high | medium | low",
+  "previous_owner_name": "full name of previous owner if present, else null",
+  "previous_owner_name_confidence": "high | medium | low",
   "survey_number": "property survey or plot number or null",
+  "survey_number_confidence": "high | medium | low",
   "transaction_date": "date in YYYY-MM-DD format or null",
+  "transaction_date_confidence": "high | medium | low",
   "transaction_type": "sale | inheritance | gift | partition | other",
   "property_location": "address or location description or null",
   "property_boundaries": "boundary description or null",
   "area": "property area with unit or null",
   "registration_number": "document registration number or null",
   "language_detected": "primary language of the document",
-  "confidence": "high | medium | low",
+  "has_handwritten_content": true or false,
+  "overall_confidence": "high | medium | low",
   "unreadable_sections": "describe unclear sections or null",
   "chain": [
     {
@@ -43,9 +51,12 @@ Rules:
 - Return ONLY the JSON object, nothing else
 - No markdown backticks
 - No explanation before or after
-- If a field is not present or not readable use null
+- If a field is not present or not readable use null, and mark its confidence as low
+- Never guess a name, date, or number you are not confident about — mark confidence low instead of inventing a plausible-looking value
+- has_handwritten_content: true if ANY part of the document contains handwritten text, even a printed form with handwritten fields filled in. false only if the entire document is printed, typed, or typewritten. Be conservative — if in doubt, mark it true
 - chain array should contain all ownership transfers visible in the document in chronological order
-- For confidence: high means everything clearly readable, medium means some parts unclear, low means significant portions unreadable"""
+- If only a year is known for a date (no specific day/month), use YYYY-01-01 and note this in unreadable_sections, rather than inventing 00 for missing parts
+- full_text must be the actual transcription, not a summary or paraphrase"""
 
 
 def _clean_json_response(raw: str) -> str:
@@ -65,7 +76,7 @@ def extract_from_image_path(image_path: str) -> Dict[str, Any]:
             image_bytes = f.read()
 
         response = client_genai.models.generate_content(
-            model="gemini-2.0-flash",
+            model="gemini-3.5-flash-lite",
             contents=[
                 types.Part.from_bytes(
                     data=image_bytes,
@@ -83,7 +94,7 @@ def extract_from_image_path(image_path: str) -> Dict[str, Any]:
             "success": True,
             "raw_output": raw_output,
             "extracted": extracted,
-            "model_used": "gemini-2.0-flash",
+            "model_used": "gemini-3.5-flash-lite",
             "error": None
         }
 
@@ -92,7 +103,7 @@ def extract_from_image_path(image_path: str) -> Dict[str, Any]:
             "success": False,
             "raw_output": raw_output,
             "extracted": None,
-            "model_used": "gemini-2.0-flash",
+            "model_used": "gemini-3.5-flash-lite",
             "error": "Model returned invalid JSON"
         }
     except Exception as e:
@@ -100,13 +111,12 @@ def extract_from_image_path(image_path: str) -> Dict[str, Any]:
             "success": False,
             "raw_output": None,
             "extracted": None,
-            "model_used": "gemini-2.0-flash",
+            "model_used": "gemini-3.5-flash-lite",
             "error": str(e)
         }
 
 
 def extract_from_supabase_url(file_url: str) -> Dict[str, Any]:
-    raw_output = None
     try:
         import httpx
         with httpx.Client() as client:
@@ -129,6 +139,6 @@ def extract_from_supabase_url(file_url: str) -> Dict[str, Any]:
             "success": False,
             "raw_output": None,
             "extracted": None,
-            "model_used": "gemini-2.0-flash",
+            "model_used": "gemini-3.5-flash-lite",
             "error": str(e)
         }

@@ -5,6 +5,7 @@ from app.repositories.case_repo import CaseRepository
 from app.repositories.flag_repo import FlagRepository
 from app.repositories.base import BaseRepository
 from app.services.llm_extractor import extract_from_supabase_url
+from app.services.doc_service import STORAGE_BUCKET
 
 class PipelineService:
     def __init__(
@@ -22,6 +23,12 @@ class PipelineService:
         # Transition document status to processing
         self.doc_repo.update_status(doc_id, "processing")
         doc = self.doc_repo.get_by_id(doc_id)
+        if not doc:
+            return {
+                "status": "failed",
+                "document_id": doc_id,
+                "error": "Document not found"
+            }
         case_id = doc["case_id"]
 
         self.case_repo.update_case(case_id, {"status": "processing"})
@@ -29,15 +36,16 @@ class PipelineService:
         # Step 1 & 2: Real LLM extraction via Gemini
         # get signed url from supabase storage to pass to gemini
         file_url = self.generic_repo.client.storage.from_(
-            "property-documents"
+            STORAGE_BUCKET
         ).create_signed_url(doc["file_path"], 300)["signedURL"]
 
         result = extract_from_supabase_url(file_url)
 
         if not result["success"]:
-            self.doc_repo.update_status(doc_id, "flagged")
+            self.doc_repo.update_status(doc_id, "processing")
+            self.case_repo.update_case(case_id, {"status": "processing"})
             return {
-                "status": "failed",
+                "status": "processing",
                 "case_id": case_id,
                 "document_id": doc_id,
                 "error": result["error"]
@@ -61,7 +69,6 @@ class PipelineService:
         }
 
         self.generic_repo.insert("extractions", extraction_payload)
-        self.doc_repo.update_status(doc_id, "llm_done")
 
         # Step 3: Populate Ownership Chain Records
         chain = extracted.get("chain", [])
@@ -87,12 +94,31 @@ class PipelineService:
                     "status": "raised"
                 })
 
-        # Finalize
-        self.doc_repo.update_status(doc_id, "under_review")
+        handwriting_detected = False
+        for key in ["handwriting_detected", "contains_handwriting", "has_handwriting"]:
+            value = extracted.get(key)
+            if isinstance(value, bool) and value:
+                handwriting_detected = True
+                break
+            if isinstance(value, str) and value.lower() in {"true", "yes", "y", "1"}:
+                handwriting_detected = True
+                break
+
+        if handwriting_detected:
+            self.doc_repo.update_status(doc_id, "flagged")
+            self.case_repo.update_case(case_id, {"status": "review"})
+            return {
+                "status": "flagged",
+                "case_id": case_id,
+                "document_id": doc_id,
+                "extracted": extracted
+            }
+
+        self.doc_repo.update_status(doc_id, "processing")
         self.case_repo.update_case(case_id, {"status": "review"})
 
         return {
-            "status": "success",
+            "status": "processing",
             "case_id": case_id,
             "document_id": doc_id,
             "extracted": extracted

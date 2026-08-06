@@ -1,0 +1,151 @@
+"use client";
+
+import { useState } from "react";
+import Link from "next/link";
+import Input from "@/components/ui/Input";
+import { signup } from "@/lib/mockApi";
+
+export default function SignupPage() {
+  const [form, setForm] = useState({
+    name: "",
+    email: "",
+    password: "",
+    confirmPassword: "",
+    phone: "",
+  });
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [loading, setLoading] = useState(false);
+
+  function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const { name, value } = e.target;
+    setForm((prev) => ({ ...prev, [name]: value }));
+  }
+
+  function validate(): Record<string, string> {
+    const next: Record<string, string> = {};
+    if (!form.name.trim()) {
+      next.name = "Name is required";
+    }
+    if (!form.email.trim()) {
+      next.email = "Email is required";
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) {
+      next.email = "Enter a valid email address";
+    }
+    if (!form.password) {
+      next.password = "Password is required";
+    } else if (form.password.length < 8) {
+      next.password = "Password must be at least 8 characters";
+    }
+    if (form.password !== form.confirmPassword) {
+      next.confirmPassword = "Passwords do not match";
+    }
+    if (form.phone && !/^[0-9+\-\s()]{7,15}$/.test(form.phone)) {
+      next.phone = "Enter a valid phone number";
+    }
+    return next;
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    const found = validate();
+    setErrors(found);
+    if (Object.keys(found).length > 0) return;
+
+    setLoading(true);
+    const result = await signup(form);
+    setLoading(false);
+
+    if (!result.success) {
+      setErrors({ form: "Signup failed" });
+      return;
+    }
+    console.log("Signed up:", result.user);
+  }
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4 py-8">
+      <div className="w-full max-w-md bg-white p-8 rounded-lg shadow">
+        <h1 className="text-2xl font-bold mb-1">Create an account</h1>
+        <p className="text-sm text-gray-500 mb-6">
+          Start running property due diligence in minutes
+        </p>
+
+        {errors.form && (
+          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md text-sm text-red-700">
+            {errors.form}
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} noValidate>
+          <Input
+            label="Full name"
+            name="name"
+            value={form.name}
+            onChange={handleChange}
+            error={errors.name}
+          />
+          <Input
+            label="Email"
+            name="email"
+            type="email"
+            value={form.email}
+            onChange={handleChange}
+            error={errors.email}
+          />
+          <Input
+            label="Password"
+            name="password"
+            type="password"
+            value={form.password}
+            onChange={handleChange}
+            error={errors.password}
+          />
+          <Input
+            label="Confirm password"
+            name="confirmPassword"
+            type="password"
+            value={form.confirmPassword}
+            onChange={handleChange}
+            error={errors.confirmPassword}
+          />
+          <Input
+            label="Phone (optional)"
+            name="phone"
+            type="tel"
+            value={form.phone}
+            onChange={handleChange}
+            error={errors.phone}
+          />
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full bg-blue-600 text-white py-2 rounded-md hover:bg-blue-700 disabled:opacity-50"
+          >
+            {loading ? "Creating account..." : "Create account"}
+          </button>
+        </form>
+
+        <div className="my-4 flex items-center gap-3">
+          <div className="flex-1 h-px bg-gray-200" />
+          <span className="text-xs text-gray-400">OR</span>
+          <div className="flex-1 h-px bg-gray-200" />
+        </div>
+
+        <button
+          type="button"
+          onClick={() => alert("Google OAuth — pending Supabase config")}
+          className="w-full border border-gray-300 py-2 rounded-md hover:bg-gray-50"
+        >
+          Continue with Google
+        </button>
+
+        <p className="mt-6 text-center text-sm text-gray-600">
+          Already have an account?{" "}
+          <Link href="/login" className="text-blue-600 hover:underline">
+            Sign in
+          </Link>
+        </p>
+      </div>
+    </div>
+  );
+}

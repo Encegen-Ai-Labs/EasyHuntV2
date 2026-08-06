@@ -6,6 +6,7 @@ from app.core.exceptions import ResourceNotFoundError, PermissionDeniedError, Pr
 from datetime import datetime, timezone
 ALLOWED_MIMETYPES = ["application/pdf", "image/png", "image/jpeg", "image/jpg"]
 MAX_FILE_SIZE = 10 * 1024 * 1024  # 10 MB
+STORAGE_BUCKET = "documents"
 
 class DocumentService:
     def __init__(self, doc_repo: DocumentRepository, case_repo: CaseRepository):
@@ -38,7 +39,7 @@ class DocumentService:
         storage_path = f"cases/{case_id}/{file_name}"
         
         # Uploading payload directly via base supabase client storage interface
-        storage_response = self.doc_repo.client.storage.from_("documents").upload(
+        self.doc_repo.client.storage.from_(STORAGE_BUCKET).upload(
             path=storage_path,
             file=file_bytes,
             file_options={"content-type": mime_type, "x-upsert": "true"}
@@ -50,7 +51,7 @@ class DocumentService:
             "file_path": storage_path,
             "file_size": file_size,
             "mime_type": mime_type,
-            "status": "uploaded",
+            "status": "processing",
             "uploaded_by": current_user["id"],
             "created_at": datetime.now(timezone.utc).isoformat()
         }

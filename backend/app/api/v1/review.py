@@ -5,6 +5,7 @@ from app.schemas.cases import CaseResponse
 from app.services.review_service import ReviewService
 from app.repositories.case_repo import CaseRepository
 from app.repositories.flag_repo import FlagRepository
+from app.repositories.doc_repo import DocumentRepository
 from app.dependencies.db import get_supabase_client
 from app.dependencies.auth import RoleRequirement
 from supabase import Client
@@ -12,7 +13,7 @@ from supabase import Client
 router = APIRouter(prefix="/review", tags=["Review System"])
 
 def get_review_service(db: Client = Depends(get_supabase_client)) -> ReviewService:
-    return ReviewService(CaseRepository(db), FlagRepository(db))
+    return ReviewService(CaseRepository(db), FlagRepository(db), DocumentRepository(db))
 
 @router.get("/pending", response_model=List[CaseResponse])
 def get_pending_reviews(

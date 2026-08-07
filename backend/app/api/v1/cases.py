@@ -46,9 +46,6 @@ def get_case_by_id(
 ):
     return service.retrieve(id, current_user)
 
-def get_pipeline_service(db: Client = Depends(get_supabase_client)) -> PipelineService:
-    return PipelineService(DocumentRepository(db), CaseRepository(db), FlagRepository(db))
-
 @router.post("/{case_id}/finalize")
 def finalize_case(
     case_id: str,

@@ -85,13 +85,13 @@ class PipelineService:
             "model_used": result["model_used"],
             "validation_errors": validation_result["errors"] + validation_result["warnings"],
             "needs_review": validation_result["needs_human_review"],
-            "has_handwritten_content": extracted.get("handwriting") is True
+            "has_handwritten_content": extracted.get("has_handwritten_content", True)
         }
 
         self.generic_repo.insert("extractions", extraction_payload)
 
         # Route based on validation instead of always going to under_review
-        if extracted.get("handwriting") is True or validation_result["needs_human_review"]:
+        if validation_result["needs_human_review"]:
             self.doc_repo.update_status(doc_id, "flagged")
         else:
             self.doc_repo.update_status(doc_id, "llm_done")

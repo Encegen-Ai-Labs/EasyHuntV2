@@ -85,13 +85,13 @@ class PipelineService:
             "model_used": result["model_used"],
             "validation_errors": validation_result["errors"] + validation_result["warnings"],
             "needs_review": validation_result["needs_human_review"],
-            "has_handwritten_content": extracted.get("has_handwritten_content", True)
+            "has_handwritten_content": extracted.get("handwriting") is True
         }
 
         self.generic_repo.insert("extractions", extraction_payload)
 
         # Route based on validation instead of always going to under_review
-        if validation_result["needs_human_review"]:
+        if extracted.get("handwriting") is True or validation_result["needs_human_review"]:
             self.doc_repo.update_status(doc_id, "flagged")
         else:
             self.doc_repo.update_status(doc_id, "llm_done")
@@ -119,16 +119,6 @@ class PipelineService:
                     "description": f"Chain link {record.get('order')} has survey {record.get('survey')} instead of {base_survey}",
                     "status": "raised"
                 })
-
-        # Flag handwritten content explicitly too, so it shows up in the case's flag list
-        if extracted.get("has_handwritten_content", True):
-            self.flag_repo.create_flag({
-                "case_id": case_id,
-                "flag_type": "Handwritten Content Detected",
-                "severity": "medium",
-                "description": "Document contains handwritten text — requires human verification regardless of AI confidence",
-                "status": "raised"
-            })
 
         # Finalize
         self.case_repo.update_case(case_id, {"status": "review"})

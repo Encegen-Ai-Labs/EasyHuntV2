@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { BarChart3, FileCheck2, Home, ListChecks, UploadCloud, UserRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { cn } from "@/lib/utils";
 
 const navItems = [
@@ -57,6 +58,7 @@ export function AppNavigation() {
         </nav>
 
         <div className="flex items-center gap-2">
+          <ThemeToggle />
           <Button variant="ghost" size="sm" className="hidden md:inline-flex" render={<Link href="/login" />}>
             Login
           </Button>

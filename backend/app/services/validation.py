@@ -52,7 +52,7 @@ def validate_extraction(extracted: Dict[str, Any]) -> Dict[str, Any]:
 
     overall_conf = extracted.get("overall_confidence")
 
-    # handwriting overrides confidence entirely - default True (flag it) if field missing
+    # Missing handwriting detection is treated conservatively and sent for review.
     is_handwritten = extracted.get("has_handwritten_content", True)
     if is_handwritten:
         warnings.append("Document contains handwritten content — flagged for review regardless of confidence")

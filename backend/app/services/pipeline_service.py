@@ -120,16 +120,6 @@ class PipelineService:
                     "status": "raised"
                 })
 
-        # Flag handwritten content explicitly too, so it shows up in the case's flag list
-        if extracted.get("has_handwritten_content", True):
-            self.flag_repo.create_flag({
-                "case_id": case_id,
-                "flag_type": "Handwritten Content Detected",
-                "severity": "medium",
-                "description": "Document contains handwritten text — requires human verification regardless of AI confidence",
-                "status": "raised"
-            })
-
         # Finalize
         self.case_repo.update_case(case_id, {"status": "review"})
 

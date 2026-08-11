@@ -1,3 +1,96 @@
+# =========================
+# Environment Variables
+# =========================
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+*.env
+!.env.example
+
+# =========================
+# Next.js
+# =========================
+.next/
+out/
+build/
+.vercel/
+.turbo/
+
+# Next.js logs
+next-env.d.ts
+
+# =========================
+# Node.js
+# =========================
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.pnpm-store/
+
+# Package manager locks (keep one)
+# package-lock.json
+# yarn.lock
+# pnpm-lock.yaml
+
+# =========================
+# Python
+# =========================
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Python packaging
+build/
+dist/
+*.egg-info/
+.eggs/
+pip-wheel-metadata/
+
+# Python caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.pyre/
+.coverage
+.coverage.*
+htmlcov/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# =========================
+# FastAPI / Uvicorn
+# =========================
+*.log
+
+# =========================
+# Supabase
+# =========================
+supabase/.temp/
+supabase/.branches/
+supabase/.cache/
+
+# Generated types (optional)
+database.types.ts
+
+# =========================
+# shadcn/ui
+# =========================
+components.json
+
+# =========================
+# IDEs & Editors
+# =========================
 # Python Virtual Environments
 env/
 venv/
@@ -41,6 +134,34 @@ MANIFEST
 *.swp
 *.swo
 *~
+# =========================
+# OS Files
+# =========================
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# =========================
+# Misc
+# =========================
+*.pem
+*.key
+*.crt
+*.sqlite
+*.sqlite3
+
+# Temporary files
+tmp/
+temp/
+.cache/
+
+# Local test uploads
+uploads/
+
+# =========================
+# TypeScript
+# =========================
+*.tsbuildinfo
 .DS_Store
 *.sublime-project
 *.sublime-workspace
@@ -138,7 +259,6 @@ instance/
 
 # Keep .gitkeep for empty directories
 !.gitkeep
-=======
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
 # dependencies

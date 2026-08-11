@@ -32,9 +32,15 @@ class ExtractionUpdate(BaseModel):
     human_correction: Optional[Dict[str, Any]] = None
     confidence: Optional[ExtractionConfidenceEnum] = None
     validation_errors: Optional[List[Dict[str, Any]]] = None
+    review_notes: Optional[str] = None
     status: Optional[ExtractionStatusEnum] = None
     reviewed_by: Optional[UUID] = None
     reviewed_at: Optional[datetime] = None
+
+class ReviewSubmission(BaseModel):
+    validated_output: Dict[str, Any]
+    review_notes: Optional[str] = None
+    decision: ExtractionStatusEnum
 
 class ExtractionResponse(ExtractionBase):
     id: UUID

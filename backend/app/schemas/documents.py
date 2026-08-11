@@ -12,6 +12,7 @@ class DocStatusEnum(str, Enum):
     under_review = "under_review"
     approved = "approved"
     flagged = "flagged"
+    rejected = "rejected"
     completed = "completed"
 
 class DocumentResponse(BaseModel):

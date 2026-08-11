@@ -14,3 +14,10 @@ class DocumentRepository(BaseRepository):
 
     def list_by_case(self, case_id: str) -> List[Dict[str, Any]]:
         return self.select("documents", {"case_id": case_id})
+
+    def list_reviewable_by_case(self, case_id: str) -> List[Dict[str, Any]]:
+        return [
+            document
+            for document in self.list_by_case(case_id)
+            if document.get("status") in {"llm_done", "flagged", "under_review"}
+        ]

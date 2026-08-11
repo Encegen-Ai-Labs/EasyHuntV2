@@ -36,11 +36,18 @@ class FakeDocRepo:
         self._inserted.append(data)
         return self
 
+    def select(self, columns):
+        return self
+
+    def eq(self, key, value):
+        return self
+
     def update(self, data):
         return self
 
     def execute(self):
-        return type("Response", (), {"data": [self._inserted[-1]]})()
+        data = [self._inserted[-1]] if self._inserted else []
+        return type("Response", (), {"data": data})()
     def _upload(self, path, file, file_options=None):
         return {"path": path}
 
@@ -59,6 +66,11 @@ class FakeDocRepo:
         self.doc["status"] = status
         return self.doc
 
+    def list_reviewable_by_case(self, case_id):
+        return [self.doc] if self.doc.get("case_id") == case_id and self.doc.get("status") in {
+            "llm_done", "flagged", "under_review"
+        } else []
+
 
 class FakeFlagRepo:
     def __init__(self):
@@ -75,6 +87,25 @@ class FakeFlagRepo:
 class FakeDocumentRepoForReview(FakeDocRepo):
     def list_by_case(self, case_id):
         return [self.doc] if self.doc.get("case_id") == case_id else []
+
+
+class FakeExtractionRepo:
+    def __init__(self, extraction=None):
+        self.extraction = extraction or {
+            "id": "extraction-1",
+            "document_id": "doc-1",
+            "validated_json_output": {"survey_number": "SY-1"},
+            "has_handwritten_content": True,
+        }
+        self.updated = []
+
+    def select_one(self, table, filters):
+        return self.extraction if filters.get("document_id") == self.extraction["document_id"] else None
+
+    def update(self, table, filters, payload):
+        self.updated.append((table, filters, payload))
+        self.extraction.update(payload)
+        return [self.extraction]
 
 
 def test_validate_and_upload_returns_processing_status_and_metadata():
@@ -111,8 +142,38 @@ def test_pipeline_marks_document_flagged_for_handwriting(monkeypatch):
 
     result = service.execute_analysis_pipeline("doc-1")
 
-    assert result["status"] == "flagged"
+    assert result["status"] == "success"
     assert doc_repo.doc["status"] == "flagged"
+
+
+def test_pipeline_writes_database_confidence_column(monkeypatch):
+    doc_repo = FakeDocRepo({
+        "id": "doc-1",
+        "case_id": "case-1",
+        "file_path": "cases/case-1/test.pdf",
+        "status": "processing",
+    })
+    case_repo = FakeCaseRepo({"id": "case-1", "created_by": "vendor-1"})
+    flag_repo = FakeFlagRepo()
+    service = PipelineService(doc_repo, case_repo, flag_repo)
+
+    monkeypatch.setattr("app.services.pipeline_service.extract_from_supabase_url", lambda file_url: {
+        "success": True,
+        "raw_output": "plain text",
+        "extracted": {
+            "overall_confidence": "high",
+            "has_handwritten_content": False,
+            "chain": [],
+        },
+        "model_used": "demo-model",
+        "error": None,
+    })
+
+    service.execute_analysis_pipeline("doc-1")
+
+    extraction_payload = doc_repo._inserted[-1]
+    assert extraction_payload["confidence"] == "high"
+    assert "confidence_score" not in extraction_payload
 
 
 def test_pipeline_keeps_document_processing_when_extraction_fails(monkeypatch):
@@ -131,8 +192,8 @@ def test_pipeline_keeps_document_processing_when_extraction_fails(monkeypatch):
 
     result = service.execute_analysis_pipeline("doc-1")
 
-    assert result["status"] == "processing"
-    assert doc_repo.doc["status"] == "processing"
+    assert result["status"] == "failed"
+    assert doc_repo.doc["status"] == "flagged"
 
 
 def test_finalize_review_marks_documents_completed():
@@ -150,3 +211,50 @@ def test_finalize_review_marks_documents_completed():
 
     assert result["status"] == "completed"
     assert doc_repo.doc["status"] == "completed"
+
+
+def test_assign_reviewer_moves_processed_documents_under_review():
+    case_repo = FakeCaseRepo({"id": "case-1", "created_by": "vendor-1"})
+    doc_repo = FakeDocRepo({
+        "id": "doc-1",
+        "case_id": "case-1",
+        "file_path": "cases/case-1/test.pdf",
+        "status": "flagged",
+    })
+    service = ReviewService(case_repo, FakeFlagRepo(), doc_repo)
+
+    result = service.assign_reviewer("case-1", "reviewer-1")
+
+    assert result["reviewer_id"] == "reviewer-1"
+    assert case_repo.case_obj["status"] == "review"
+    assert doc_repo.doc["status"] == "under_review"
+
+
+def test_reviewer_submission_persists_edits_notes_and_rejection():
+    case_repo = FakeCaseRepo()
+    doc_repo = FakeDocRepo({
+        "id": "doc-1",
+        "case_id": "case-1",
+        "file_path": "cases/case-1/test.pdf",
+        "status": "under_review",
+    })
+    extraction_repo = FakeExtractionRepo()
+    service = ReviewService(
+        case_repo,
+        FakeFlagRepo(),
+        doc_repo,
+        extraction_repo,
+    )
+
+    result = service.submit_document_review(
+        "doc-1",
+        "reviewer-1",
+        {"survey_number": "SY-CORRECTED"},
+        "Survey number needs verification.",
+        "rejected",
+    )
+
+    assert result["document"]["status"] == "rejected"
+    assert result["extraction"]["validated_json_output"] == {"survey_number": "SY-CORRECTED"}
+    assert result["extraction"]["review_notes"] == "Survey number needs verification."
+    assert result["extraction"]["status"] == "rejected"

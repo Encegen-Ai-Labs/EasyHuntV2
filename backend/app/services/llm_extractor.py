@@ -69,18 +69,32 @@ def _clean_json_response(raw: str) -> str:
     return raw.strip()
 
 
+def _get_mime_type(file_path: str) -> str:
+    ext = file_path.lower().rsplit(".", 1)[-1] if "." in file_path else ""
+    mime_map = {
+        "jpg": "image/jpeg",
+        "jpeg": "image/jpeg",
+        "png": "image/png",
+        "webp": "image/webp",
+        "pdf": "application/pdf"
+    }
+    return mime_map.get(ext, "image/jpeg")
+
+
 def extract_from_image_path(image_path: str) -> Dict[str, Any]:
     raw_output = None
     try:
         with open(image_path, "rb") as f:
-            image_bytes = f.read()
+            file_bytes = f.read()
+
+        mime_type = _get_mime_type(image_path)
 
         response = client_genai.models.generate_content(
             model="gemini-3.5-flash-lite",
             contents=[
                 types.Part.from_bytes(
-                    data=image_bytes,
-                    mime_type="image/jpeg"
+                    data=file_bytes,
+                    mime_type=mime_type
                 ),
                 EXTRACTION_PROMPT
             ],

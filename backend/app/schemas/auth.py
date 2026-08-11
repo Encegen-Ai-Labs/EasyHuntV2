@@ -15,6 +15,11 @@ class UserRegister(BaseModel):
     organisation_name: str
     role: RoleEnum = RoleEnum.Vendor
 
+class ReviewerCreate(BaseModel):
+    email: EmailStr
+    password: str = Field(..., min_length=8)
+    organisation_name: str
+
 class UserLogin(BaseModel):
     email: EmailStr
     password: str

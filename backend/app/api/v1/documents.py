@@ -22,17 +22,24 @@ def get_pipeline_service(db: Client = Depends(get_supabase_client)) -> PipelineS
 async def upload_document(
     case_id: str = Form(...),
     file: UploadFile = File(...),
+    background_tasks: BackgroundTasks = None,
     current_user: Dict[str, Any] = Depends(RoleRequirement(["Vendor", "Admin"])),
-    service: DocumentService = Depends(get_doc_service)
+    service: DocumentService = Depends(get_doc_service),
+    pipeline_service: PipelineService = Depends(get_pipeline_service)
 ):
     file_bytes = await file.read()
-    return service.validate_and_upload(
+    document = service.validate_and_upload(
         case_id=case_id,
         file_name=file.filename,
         file_bytes=file_bytes,
         mime_type=file.content_type,
         current_user=current_user
     )
+
+    if background_tasks is not None and document.get("id"):
+        background_tasks.add_task(pipeline_service.execute_analysis_pipeline, document["id"])
+
+    return document
 
 @router.post("/{id}/process")
 def process_document(

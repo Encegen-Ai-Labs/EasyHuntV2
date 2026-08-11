@@ -1,7 +1,10 @@
+from uuid import uuid4
+
 from fastapi.testclient import TestClient
 
-from app.main import app
+from app.dependencies.auth import get_current_user
 from app.dependencies.db import get_supabase_client
+from app.main import app
 
 client = TestClient(app)
 
@@ -15,13 +18,9 @@ class FakeUserRepository:
         return self.users.get(email)
 
     def create_user(self, user_data):
+        user_data = {**user_data, "id": str(uuid4())}
         self.users[user_data["email"]] = user_data
-        return {
-            "id": user_data["id"],
-            "email": user_data["email"],
-            "role": user_data["role"],
-            "password_hash": user_data["password_hash"],
-        }
+        return user_data
 
 
 def test_register_user_returns_token(monkeypatch):
@@ -33,7 +32,7 @@ def test_register_user_returns_token(monkeypatch):
 
     response = client.post(
         "/api/v1/auth/register",
-        json={"email": "new@example.com", "password": "password123", "role": "Vendor"},
+        json={"email": "new@example.com", "password": "password123", "role": "Vendor", "organisation_name": "Test Org"},
     )
 
     assert response.status_code == 201
@@ -50,7 +49,7 @@ def test_reviewer_registration_is_rejected(monkeypatch):
 
     response = client.post(
         "/api/v1/auth/register",
-        json={"email": "reviewer@example.com", "password": "password123", "role": "Reviewer"},
+        json={"email": "reviewer@example.com", "password": "password123", "role": "Reviewer", "organisation_name": "Test Org"},
     )
 
     assert response.status_code == 403
@@ -88,11 +87,8 @@ def test_admin_can_create_reviewer(monkeypatch):
 
     monkeypatch.setattr("app.api.v1.admin.UserRepository", AdminRepository)
     monkeypatch.setattr("app.api.v1.admin.get_password_hash", lambda password: "argon2-hash")
-    monkeypatch.setattr(
-        "app.api.v1.admin.get_current_user",
-        lambda: {"id": "admin-id", "role": "Admin"},
-    )
     app.dependency_overrides[get_supabase_client] = lambda: object()
+    app.dependency_overrides[get_current_user] = lambda: {"id": "admin-id", "role": "Admin"}
 
     response = client.post(
         "/api/v1/admin/reviewers",

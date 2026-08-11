@@ -75,3 +75,41 @@ def test_admin_login_uses_environment_credentials(monkeypatch):
     assert response.json()["role"] == "Admin"
 
     app.dependency_overrides.clear()
+
+
+def test_admin_can_create_reviewer(monkeypatch):
+    class AdminRepository(FakeUserRepository):
+        def get_by_email(self, email):
+            return None
+
+        def create_user(self, user_data):
+            user_data["id"] = "reviewer-id"
+            return user_data
+
+    monkeypatch.setattr("app.api.v1.admin.UserRepository", AdminRepository)
+    monkeypatch.setattr("app.api.v1.admin.get_password_hash", lambda password: "argon2-hash")
+    monkeypatch.setattr(
+        "app.api.v1.admin.get_current_user",
+        lambda: {"id": "admin-id", "role": "Admin"},
+    )
+    app.dependency_overrides[get_supabase_client] = lambda: object()
+
+    response = client.post(
+        "/api/v1/admin/reviewers",
+        headers={"Authorization": "Bearer test-token"},
+        json={
+            "email": "reviewer@example.com",
+            "password": "password123",
+            "organisation_name": "Example Organisation",
+        },
+    )
+
+    assert response.status_code == 201
+    assert response.json() == {
+        "user_id": "reviewer-id",
+        "email": "reviewer@example.com",
+        "role": "Reviewer",
+        "password": "password123",
+    }
+
+    app.dependency_overrides.clear()

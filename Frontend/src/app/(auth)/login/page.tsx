@@ -2,10 +2,13 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import Input from "@/components/ui/Input";
-import { login } from "@/lib/mockApi";
+
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:8000";
 
 export default function LoginPage() {
+  const router = useRouter();
   const [form, setForm] = useState({ email: "", password: "" });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
@@ -35,14 +38,26 @@ export default function LoginPage() {
     if (Object.keys(found).length > 0) return;
 
     setLoading(true);
-    const result = await login(form.email, form.password);
-    setLoading(false);
+    try {
+      const response = await fetch(`${API_BASE}/api/v1/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        setErrors({ form: result.detail ?? "Login failed" });
+        return;
+      }
 
-    if (!result.success) {
-      setErrors({ form: result.error ?? "Login failed" });
-      return;
+      localStorage.setItem("access_token", result.access_token);
+      localStorage.setItem("user_role", result.role);
+      router.push(result.role === "Admin" ? "/admin" : "/cases");
+    } catch {
+      setErrors({ form: "Could not connect to the backend" });
+    } finally {
+      setLoading(false);
     }
-    console.log("Logged in:", result.user);
   }
 
   return (

@@ -77,11 +77,7 @@ class PipelineService:
             "raw_ocr_text": result["raw_output"],
             "raw_json_output": raw_json,
             "validated_json_output": validated_json,
-            "confidence_score": {
-                "high": 95.0,
-                "medium": 70.0,
-                "low": 40.0
-            }.get(extracted.get("overall_confidence", "low"), 40.0),
+            "confidence": extracted.get("overall_confidence", "low"),
             "model_used": result["model_used"],
             "validation_errors": validation_result["errors"] + validation_result["warnings"],
             "needs_review": validation_result["needs_human_review"],

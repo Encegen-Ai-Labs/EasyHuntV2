@@ -1,32 +1,49 @@
 "use client";
 
+import React, { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useSignupMutation } from "@/services/api/hooks";
+import { useAuth } from "@/context/AuthContext";
+import { useToast } from "@/context/ToastContext";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/Input";
 import { Separator } from "@/components/ui/separator";
-import { CheckCircle2 } from "lucide-react";
+import { CheckCircle2, Loader2 } from "lucide-react";
 
 export function SignupPage() {
   const router = useRouter();
-  const signupMutation = useSignupMutation();
+  const { signup } = useAuth();
+  const toast = useToast();
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    setIsSubmitting(true);
+
     const form = event.currentTarget;
     const formData = new FormData(form);
-    const payload = {
-      name: String(formData.get("name") ?? ""),
-      email: String(formData.get("email") ?? ""),
-      password: String(formData.get("password") ?? ""),
-      confirmPassword: String(formData.get("password") ?? ""),
-      phone: "",
-    };
-    const result = await signupMutation.mutateAsync(payload);
-    if (result.success) {
-      router.push("/login");
+    const name = String(formData.get("name") ?? "");
+    const email = String(formData.get("email") ?? "");
+    const password = String(formData.get("password") ?? "");
+
+    if (!email || !password) {
+      toast.error("Please fill in all required fields", "Validation Error");
+      setIsSubmitting(false);
+      return;
+    }
+
+    try {
+      const result = await signup({ name, email, password });
+      if (result.success) {
+        toast.success("Account created successfully! Welcome to PropVerify AI.", "Signup Successful");
+        router.push("/dashboard");
+      } else {
+        toast.error(result.error || "Failed to create account", "Signup Failed");
+      }
+    } catch (err: any) {
+      toast.error(err.message || "An unexpected error occurred during signup", "Error");
+    } finally {
+      setIsSubmitting(false);
     }
   }
 
@@ -79,22 +96,29 @@ export function SignupPage() {
                 <label htmlFor="signup-name" className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
                   Full name
                 </label>
-                <Input id="signup-name" name="name" placeholder="Alex Carter" />
+                <Input id="signup-name" name="name" placeholder="Alex Carter" disabled={isSubmitting} />
               </div>
               <div className="flex flex-col gap-1.5">
                 <label htmlFor="signup-email" className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
                   Work email
                 </label>
-                <Input id="signup-email" name="email" type="email" placeholder="alex@company.com" />
+                <Input id="signup-email" name="email" type="email" placeholder="alex@company.com" required disabled={isSubmitting} />
               </div>
               <div className="flex flex-col gap-1.5">
                 <label htmlFor="signup-password" className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
                   Password
                 </label>
-                <Input id="signup-password" name="password" type="password" placeholder="••••••••" />
+                <Input id="signup-password" name="password" type="password" placeholder="••••••••" required disabled={isSubmitting} />
               </div>
-              <Button type="submit" className="w-full" disabled={signupMutation.isPending}>
-                {signupMutation.isPending ? "Creating workspace…" : "Create workspace"}
+              <Button type="submit" className="w-full" disabled={isSubmitting}>
+                {isSubmitting ? (
+                  <>
+                    <Loader2 size={16} className="animate-spin" data-icon="inline-start" />
+                    Creating workspace…
+                  </>
+                ) : (
+                  "Create workspace"
+                )}
               </Button>
             </form>
 
@@ -105,8 +129,8 @@ export function SignupPage() {
             </div>
 
             <div className="grid grid-cols-2 gap-3">
-              <Button variant="outline" className="w-full">Google</Button>
-              <Button variant="outline" className="w-full">Microsoft</Button>
+              <Button variant="outline" className="w-full" disabled={isSubmitting}>Google</Button>
+              <Button variant="outline" className="w-full" disabled={isSubmitting}>Microsoft</Button>
             </div>
 
             <p className="mt-7 text-center text-sm text-muted-foreground">

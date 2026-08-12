@@ -1,17 +1,46 @@
-import {
-  getCaseById as mockGetCaseById,
-  getDashboardCases as mockGetDashboardCases,
-  getExtractedFields as mockGetExtractedFields,
-  login as mockLogin,
-  signup as mockSignup,
-  type CaseRecord,
-  type SignupData,
-} from "@/services/api/mockApi";
+export interface UserRecord {
+  id: string;
+  email: string;
+  role: string;
+  organisation_name?: string;
+  created_at?: string;
+}
+
+export interface CaseRecord {
+  id: string;
+  title: string;
+  property_name?: string;
+  survey_number?: string;
+  location?: string;
+  address: string;
+  propertyType: string;
+  createdAt: string;
+  priority: string;
+  status: string;
+  assignee: {
+    name: string;
+    avatar: string;
+    id?: string;
+  };
+  reviewer_id?: string;
+  risk: string;
+  confidence: number;
+}
+
+export interface FlagItem {
+  id: string;
+  case_id: string;
+  flag_type: string;
+  severity: "low" | "medium" | "high" | "critical";
+  description: string;
+  status: "raised" | "resolved" | "pending";
+  resolution_notes?: string;
+  created_at?: string;
+}
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_URL ||
   process.env.NEXT_PUBLIC_BACKEND_URL ||
-  process.env.BACKEND_URL ||
   "http://localhost:8000/api/v1";
 
 function getAuthHeaders(extraHeaders: Record<string, string> = {}): Record<string, string> {
@@ -25,98 +54,39 @@ function getAuthHeaders(extraHeaders: Record<string, string> = {}): Record<strin
   return headers;
 }
 
-function normalizeCase(item: any): CaseRecord {
-  const statusMap: Record<string, CaseRecord["status"]> = {
-    open: "Processing",
-    processing: "Processing",
-    review: "Needs Review",
-    completed: "Completed",
-    flagged: "Flagged",
-    draft: "Draft",
-  };
+async function handleFetchResponse(res: Response) {
+  if (res.status === 401) {
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("auth:unauthorized"));
+    }
+    throw new Error("Unauthorized (401). Redirecting to login.");
+  }
+  if (res.status === 403) {
+    let errMessage = "Access Denied (403). Insufficient permissions.";
+    try {
+      const data = await res.json();
+      if (data.detail) errMessage = data.detail;
+    } catch {}
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("auth:forbidden", { detail: { message: errMessage } }));
+    }
+    throw new Error(errMessage);
+  }
 
-  return {
-    id: String(item.id || item.case_id || "PV-0000"),
-    title: item.title || item.property_name || "Untitled Property",
-    address: item.address || item.location || "Address N/A",
-    propertyType: item.propertyType || item.property_type || "Residential",
-    createdAt: item.createdAt || item.created_at?.split("T")[0] || new Date().toISOString().split("T")[0],
-    priority: item.priority || "High",
-    status: statusMap[item.status?.toLowerCase()] || item.status || "Needs Review",
-    assignee: item.assignee || { name: "System Reviewer", avatar: "SR" },
-    risk: item.risk || "Medium",
-    confidence: item.confidence ?? 85,
-  };
+  if (!res.ok) {
+    let errorDetail = `HTTP Error ${res.status}`;
+    try {
+      const errData = await res.json();
+      errorDetail = errData.detail || errData.message || errorDetail;
+    } catch {}
+    throw new Error(errorDetail);
+  }
+
+  return res.json();
 }
 
 export const apiClient = {
   baseUrl: API_BASE_URL,
-
-  dashboard: {
-    getCases: async (): Promise<{ data: CaseRecord[] }> => {
-      try {
-        const res = await fetch(`${API_BASE_URL}/cases`, {
-          headers: getAuthHeaders({ "Content-Type": "application/json" }),
-        });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = await res.json();
-        const cases = Array.isArray(data) ? data.map(normalizeCase) : [];
-        return { data: cases };
-      } catch (err) {
-        console.warn("Backend API unavailable for dashboard cases, falling back to mock:", err);
-        return mockGetDashboardCases();
-      }
-    },
-  },
-
-  cases: {
-    getById: async (id: string): Promise<{ data: CaseRecord }> => {
-      try {
-        const res = await fetch(`${API_BASE_URL}/cases/${id}`, {
-          headers: getAuthHeaders({ "Content-Type": "application/json" }),
-        });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const item = await res.json();
-        return { data: normalizeCase(item) };
-      } catch (err) {
-        console.warn(`Backend API unavailable for case ${id}, falling back to mock:`, err);
-        return mockGetCaseById(id);
-      }
-    },
-
-    create: async (payload: { property_name: string; survey_number: string; location?: string }) => {
-      try {
-        const res = await fetch(`${API_BASE_URL}/cases`, {
-          method: "POST",
-          headers: getAuthHeaders({ "Content-Type": "application/json" }),
-          body: JSON.stringify(payload),
-        });
-        if (!res.ok) {
-          const errData = await res.json().catch(() => ({}));
-          throw new Error(errData.detail || `Failed with status ${res.status}`);
-        }
-        const data = await res.json();
-        return { success: true, data: normalizeCase(data) };
-      } catch (err: any) {
-        console.warn("Error creating case via backend API:", err);
-        return { success: false, error: err.message };
-      }
-    },
-
-    getExtractedFields: async () => {
-      try {
-        const res = await fetch(`${API_BASE_URL}/cases/extracted-fields`, {
-          headers: getAuthHeaders({ "Content-Type": "application/json" }),
-        });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = await res.json();
-        return { data };
-      } catch (err) {
-        console.warn("Backend API unavailable for extracted fields, falling back to mock:", err);
-        return mockGetExtractedFields();
-      }
-    },
-  },
 
   auth: {
     login: async (email: string, password: string) => {
@@ -126,40 +96,24 @@ export const apiClient = {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ email, password }),
         });
-
-        if (!res.ok) {
-          const errData = await res.json().catch(() => ({}));
-          return {
-            success: false,
-            error: errData.detail || "Invalid login credentials",
-          };
-        }
-
-        const data = await res.json();
-        if (data.access_token && typeof window !== "undefined") {
-          localStorage.setItem("propverify_token", data.access_token);
-          if (data.user_id) localStorage.setItem("propverify_user_id", data.user_id);
-          if (data.role) localStorage.setItem("propverify_role", data.role);
-        }
-
+        const data = await handleFetchResponse(res);
         return {
           success: true,
-          token: data.access_token,
+          token: data.access_token || data.token,
           user: {
             id: data.user_id || "1",
             email: data.email || email,
             role: data.role || "Vendor",
           },
         };
-      } catch (err) {
-        console.warn("Backend login failed, using mock auth fallback:", err);
-        return mockLogin(email, password);
+      } catch (err: any) {
+        return { success: false, error: err.message || "Invalid credentials" };
       }
     },
 
-    signup: async (payload: SignupData) => {
+    signup: async (payload: { email: string; password: string; name?: string }) => {
       try {
-        const res = await fetch(`${API_BASE_URL}/auth/register`, {
+        const res = await fetch(`${API_BASE_URL}/auth/signup`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -169,138 +123,264 @@ export const apiClient = {
             role: "Vendor",
           }),
         });
-
-        if (!res.ok) {
-          const errData = await res.json().catch(() => ({}));
-          return {
-            success: false,
-            error: errData.detail || "Failed to create account",
-          };
-        }
-
-        const data = await res.json();
-        if (data.token && typeof window !== "undefined") {
-          localStorage.setItem("propverify_token", data.token);
-          if (data.user_id) localStorage.setItem("propverify_user_id", data.user_id);
-        }
-
+        const data = await handleFetchResponse(res);
         return {
           success: true,
+          token: data.token || data.access_token,
           user: {
             id: data.user_id || "2",
             email: data.email || payload.email,
             name: payload.name,
+            role: data.role || "Vendor",
           },
         };
-      } catch (err) {
-        console.warn("Backend signup failed, using mock auth fallback:", err);
-        return mockSignup(payload);
+      } catch (err: any) {
+        return { success: false, error: err.message || "Failed to create account" };
       }
+    },
+
+    logout: async () => {
+      try {
+        await fetch(`${API_BASE_URL}/auth/logout`, {
+          method: "POST",
+          headers: getAuthHeaders({ "Content-Type": "application/json" }),
+        });
+      } catch {}
+    },
+  },
+
+  admin: {
+    getUsers: async (): Promise<UserRecord[]> => {
+      const res = await fetch(`${API_BASE_URL}/admin/users`, {
+        headers: getAuthHeaders({ "Content-Type": "application/json" }),
+      });
+      return handleFetchResponse(res);
+    },
+
+    createReviewer: async (payload: { email: string; password: string; organisation_name: string }) => {
+      const res = await fetch(`${API_BASE_URL}/admin/reviewers`, {
+        method: "POST",
+        headers: getAuthHeaders({ "Content-Type": "application/json" }),
+        body: JSON.stringify(payload),
+      });
+      return handleFetchResponse(res);
+    },
+
+    assignReviewer: async (caseId: string, reviewerId: string) => {
+      const res = await fetch(
+        `${API_BASE_URL}/admin/assign-reviewer?case_id=${encodeURIComponent(caseId)}&reviewer_id=${encodeURIComponent(reviewerId)}`,
+        {
+          method: "POST",
+          headers: getAuthHeaders({ "Content-Type": "application/json" }),
+        }
+      );
+      return handleFetchResponse(res);
+    },
+  },
+
+  cases: {
+    list: async (statusFilter?: string): Promise<{ data: CaseRecord[] }> => {
+      try {
+        const url = new URL(`${API_BASE_URL}/cases`);
+        if (statusFilter && statusFilter !== "all") {
+          url.searchParams.append("status", statusFilter);
+        }
+        const res = await fetch(url.toString(), {
+          headers: getAuthHeaders({ "Content-Type": "application/json" }),
+        });
+        const data = await handleFetchResponse(res);
+        const casesList = Array.isArray(data) ? data : [];
+        return { data: casesList };
+      } catch (err: any) {
+        console.warn("Failed to fetch cases from API:", err.message);
+        return { data: [] };
+      }
+    },
+
+    getById: async (id: string): Promise<CaseRecord> => {
+      const res = await fetch(`${API_BASE_URL}/cases/${id}`, {
+        headers: getAuthHeaders({ "Content-Type": "application/json" }),
+      });
+      return handleFetchResponse(res);
+    },
+
+    create: async (payload: { property_name: string; survey_number: string; location: string }) => {
+      const res = await fetch(`${API_BASE_URL}/cases`, {
+        method: "POST",
+        headers: getAuthHeaders({ "Content-Type": "application/json" }),
+        body: JSON.stringify(payload),
+      });
+      return handleFetchResponse(res);
+    },
+
+    finalize: async (caseId: string) => {
+      const res = await fetch(`${API_BASE_URL}/cases/${caseId}/finalize`, {
+        method: "POST",
+        headers: getAuthHeaders({ "Content-Type": "application/json" }),
+      });
+      return handleFetchResponse(res);
     },
   },
 
   documents: {
-    upload: async (caseId: string, file: File) => {
-      try {
+    upload: (
+      caseId: string,
+      file: File,
+      options?: {
+        onProgress?: (progress: number) => void;
+        signal?: AbortSignal;
+      }
+    ): Promise<{ success: boolean; data?: any; error?: string }> => {
+      return new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open("POST", `${API_BASE_URL}/documents/upload`);
+
+        const token = typeof window !== "undefined" ? localStorage.getItem("propverify_token") : null;
+        if (token) {
+          xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+        }
+
+        if (options?.signal) {
+          options.signal.addEventListener("abort", () => {
+            xhr.abort();
+            reject(new DOMException("Upload canceled by user", "AbortError"));
+          });
+        }
+
+        if (xhr.upload && options?.onProgress) {
+          xhr.upload.onprogress = (e) => {
+            if (e.lengthComputable) {
+              const percentComplete = Math.round((e.loaded / e.total) * 100);
+              options.onProgress!(percentComplete);
+            }
+          };
+        }
+
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            try {
+              const resData = JSON.parse(xhr.responseText);
+              resolve({ success: true, data: resData });
+            } catch {
+              resolve({ success: true, data: { id: "doc-uploaded" } });
+            }
+          } else if (xhr.status === 401) {
+            if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent("auth:unauthorized"));
+            reject(new Error("Unauthorized (401)"));
+          } else if (xhr.status === 403) {
+            if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent("auth:forbidden"));
+            reject(new Error("Forbidden (403)"));
+          } else {
+            reject(new Error(`Upload failed with status ${xhr.status}`));
+          }
+        };
+
+        xhr.onerror = () => reject(new Error("Network error during document upload"));
+        xhr.onabort = () => reject(new DOMException("Upload canceled by user", "AbortError"));
+
         const formData = new FormData();
         formData.append("case_id", caseId);
         formData.append("file", file);
 
-        const res = await fetch(`${API_BASE_URL}/documents/upload`, {
-          method: "POST",
-          headers: getAuthHeaders(),
-          body: formData,
-        });
-
-        if (!res.ok) {
-          const errData = await res.json().catch(() => ({}));
-          throw new Error(errData.detail || `Upload failed with status ${res.status}`);
-        }
-
-        return { success: true, data: await res.json() };
-      } catch (err: any) {
-        return { success: false, error: err.message };
-      }
+        xhr.send(formData);
+      });
     },
 
     process: async (docId: string) => {
-      try {
-        const res = await fetch(`${API_BASE_URL}/documents/${docId}/process`, {
+      const res = await fetch(`${API_BASE_URL}/documents/${docId}/process`, {
+        method: "POST",
+        headers: getAuthHeaders({ "Content-Type": "application/json" }),
+      });
+      return handleFetchResponse(res);
+    },
+
+    getStatus: async (documentId: string) => {
+      const res = await fetch(`${API_BASE_URL}/documents/${documentId}/status`, {
+        headers: getAuthHeaders({ "Content-Type": "application/json" }),
+      });
+      return handleFetchResponse(res);
+    },
+  },
+
+  review: {
+    getPending: async (): Promise<CaseRecord[]> => {
+      const res = await fetch(`${API_BASE_URL}/review/pending`, {
+        headers: getAuthHeaders({ "Content-Type": "application/json" }),
+      });
+      return handleFetchResponse(res);
+    },
+
+    submitDocumentDecision: async (
+      documentId: string,
+      payload: {
+        validated_output: Record<string, any>;
+        review_notes?: string;
+        decision: "approved" | "rejected";
+      }
+    ) => {
+      const res = await fetch(`${API_BASE_URL}/review/documents/${documentId}`, {
+        method: "PATCH",
+        headers: getAuthHeaders({ "Content-Type": "application/json" }),
+        body: JSON.stringify(payload),
+      });
+      return handleFetchResponse(res);
+    },
+
+    finalizeCaseDecision: async (caseId: string, decision: "approve" | "reject") => {
+      const res = await fetch(
+        `${API_BASE_URL}/review/${encodeURIComponent(caseId)}/decision?decision=${encodeURIComponent(decision)}`,
+        {
           method: "POST",
           headers: getAuthHeaders({ "Content-Type": "application/json" }),
-        });
-        if (!res.ok) {
-          const errData = await res.json().catch(() => ({}));
-          throw new Error(errData.detail || `Processing failed with status ${res.status}`);
         }
-        return { success: true, data: await res.json() };
-      } catch (err: any) {
-        return { success: false, error: err.message };
-      }
+      );
+      return handleFetchResponse(res);
+    },
+  },
+
+  flags: {
+    list: async (caseId?: string): Promise<FlagItem[]> => {
+      const url = new URL(`${API_BASE_URL}/flags`);
+      if (caseId) url.searchParams.append("case_id", caseId);
+      const res = await fetch(url.toString(), {
+        headers: getAuthHeaders({ "Content-Type": "application/json" }),
+      });
+      return handleFetchResponse(res);
+    },
+
+    raise: async (caseId: string, payload: { flag_type: string; severity: "low" | "medium" | "high" | "critical"; description: string }) => {
+      const res = await fetch(`${API_BASE_URL}/flags/${encodeURIComponent(caseId)}`, {
+        method: "POST",
+        headers: getAuthHeaders({ "Content-Type": "application/json" }),
+        body: JSON.stringify(payload),
+      });
+      return handleFetchResponse(res);
+    },
+
+    resolve: async (flagId: string, resolutionNotes: string, status = "resolved") => {
+      const res = await fetch(`${API_BASE_URL}/review/flag/${encodeURIComponent(flagId)}/resolve`, {
+        method: "POST",
+        headers: getAuthHeaders({ "Content-Type": "application/json" }),
+        body: JSON.stringify({ resolution_notes: resolutionNotes, status }),
+      });
+      return handleFetchResponse(res);
     },
   },
 
   reports: {
     generate: async (caseId: string) => {
-      try {
-        const res = await fetch(`${API_BASE_URL}/reports/generate/${caseId}`, {
-          method: "POST",
-          headers: getAuthHeaders({ "Content-Type": "application/json" }),
-        });
-        if (!res.ok) {
-          const errData = await res.json().catch(() => ({}));
-          throw new Error(errData.detail || `Report generation failed`);
-        }
-        return { success: true, data: await res.json() };
-      } catch (err: any) {
-        return { success: false, error: err.message };
-      }
+      const res = await fetch(`${API_BASE_URL}/reports/generate/${encodeURIComponent(caseId)}`, {
+        method: "POST",
+        headers: getAuthHeaders({ "Content-Type": "application/json" }),
+      });
+      return handleFetchResponse(res);
     },
 
-    download: async (caseId: string) => {
-      try {
-        const res = await fetch(`${API_BASE_URL}/reports/download/${caseId}`, {
-          headers: getAuthHeaders({ "Content-Type": "application/json" }),
-        });
-        if (!res.ok) {
-          const errData = await res.json().catch(() => ({}));
-          throw new Error(errData.detail || `Download failed`);
-        }
-        return { success: true, data: await res.json() };
-      } catch (err: any) {
-        return { success: false, error: err.message };
-      }
-    },
-  },
-
-  flags: {
-    list: async (caseId?: string) => {
-      try {
-        const url = new URL(`${API_BASE_URL}/flags`);
-        if (caseId) url.searchParams.append("case_id", caseId);
-
-        const res = await fetch(url.toString(), {
-          headers: getAuthHeaders({ "Content-Type": "application/json" }),
-        });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        return { success: true, data: await res.json() };
-      } catch (err: any) {
-        return { success: false, error: err.message };
-      }
-    },
-
-    resolve: async (flagId: string, resolutionNotes: string, status = "resolved") => {
-      try {
-        const res = await fetch(`${API_BASE_URL}/flags/${flagId}/resolve`, {
-          method: "PUT",
-          headers: getAuthHeaders({ "Content-Type": "application/json" }),
-          body: JSON.stringify({ resolution_notes: resolutionNotes, status }),
-        });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        return { success: true, data: await res.json() };
-      } catch (err: any) {
-        return { success: false, error: err.message };
-      }
+    getDownloadUrl: async (caseId: string): Promise<{ download_url: string }> => {
+      const res = await fetch(`${API_BASE_URL}/reports/download/${encodeURIComponent(caseId)}`, {
+        headers: getAuthHeaders({ "Content-Type": "application/json" }),
+      });
+      return handleFetchResponse(res);
     },
   },
 };

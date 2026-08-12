@@ -1,35 +1,137 @@
-import { Calendar, CheckCircle2, Clock, Download, FileText, ShieldCheck } from "lucide-react";
+"use client";
+
+import React, { useState, useEffect, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
+import {
+  Calendar,
+  CheckCircle2,
+  Clock,
+  Download,
+  FileText,
+  ShieldCheck,
+  Loader2,
+  RefreshCw,
+  AlertTriangle,
+} from "lucide-react";
+import { apiClient } from "@/services/api/client";
+import { useToast } from "@/context/ToastContext";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 
-export function ReportPage() {
+function ReportContent() {
+  const searchParams = useSearchParams();
+  const caseIdParam = searchParams.get("caseId") || "PV-2408";
+  const toast = useToast();
+
+  const [caseId, setCaseId] = useState<string>(caseIdParam);
+  const [reportData, setReportData] = useState<any>(null);
+  const [isLoadingSummary, setIsLoadingSummary] = useState<boolean>(false);
+  const [isDownloadingPdf, setIsDownloadingPdf] = useState<boolean>(false);
+
+  // Load summary on mount
+  async function fetchSummary() {
+    setIsLoadingSummary(true);
+    try {
+      const summary = await apiClient.reports.getSummary(caseId);
+      setReportData(summary);
+      toast.success(`Executive report generated for case ${caseId}`, "Report Loaded");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to load report summary", "Report Error");
+    } finally {
+      setIsLoadingSummary(false);
+    }
+  }
+
+  useEffect(() => {
+    fetchSummary();
+  }, [caseId]);
+
+  // Download PDF Blob Handler
+  async function handleDownloadPdf() {
+    setIsDownloadingPdf(true);
+    try {
+      await apiClient.reports.downloadPdf(caseId);
+      toast.success(`Report-${caseId}.pdf downloaded successfully!`, "Export Complete");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to compile PDF report", "Download Failed");
+    } finally {
+      setIsDownloadingPdf(false);
+    }
+  }
+
   return (
     <div className="min-h-screen bg-background px-4 py-10">
       <div className="mx-auto max-w-6xl">
         {/* Header */}
         <header className="mb-6 flex flex-wrap items-center justify-between gap-4">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Executive Report</p>
-            <h1 className="mt-1 text-3xl font-bold tracking-tight">PV-2408 / Meridian Avenue</h1>
+            <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Executive Report Hub</p>
+            <h1 className="mt-1 text-3xl font-bold tracking-tight">{caseId} / Meridian Avenue</h1>
           </div>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm">
-              <Download data-icon="inline-start" />
-              Export PDF
+
+          <div className="flex items-center gap-3">
+            {/* Generate Report Summary Button */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={fetchSummary}
+              disabled={isLoadingSummary}
+            >
+              <RefreshCw size={14} className={isLoadingSummary ? "animate-spin" : ""} data-icon="inline-start" />
+              {isLoadingSummary ? "Compiling…" : "Generate Report Summary"}
             </Button>
-            <Button size="sm">Generate Summary</Button>
+
+            {/* Download PDF Report Button */}
+            <Button
+              size="sm"
+              onClick={handleDownloadPdf}
+              disabled={isDownloadingPdf}
+              className="bg-primary text-primary-foreground font-semibold gap-2"
+            >
+              {isDownloadingPdf ? (
+                <>
+                  <Loader2 size={16} className="animate-spin" />
+                  Compiling PDF…
+                </>
+              ) : (
+                <>
+                  <Download size={16} />
+                  Download PDF Report
+                </>
+              )}
+            </Button>
           </div>
         </header>
 
-        {/* Stats */}
+        {/* Stats strip */}
         <section className="grid gap-4 md:grid-cols-4">
           {[
-            { title: "Property Specs", value: "Residential", detail: "2,140 SF", icon: <FileText size={16} /> },
-            { title: "Cleared Items", value: "07", detail: "No open issues", icon: <CheckCircle2 size={16} /> },
-            { title: "Resolved Risks", value: "02", detail: "Low confidence fields", icon: <ShieldCheck size={16} /> },
-            { title: "Audit Trail", value: "14", detail: "Events logged", icon: <Clock size={16} /> },
+            {
+              title: "Property Specs",
+              value: reportData?.property_specs?.type || "Residential",
+              detail: reportData?.property_specs?.size || "2,140 SF",
+              icon: <FileText size={16} />,
+            },
+            {
+              title: "Cleared Items",
+              value: String(reportData?.cleared_items ?? "07"),
+              detail: "No open issues",
+              icon: <CheckCircle2 size={16} />,
+            },
+            {
+              title: "Resolved Risks",
+              value: String(reportData?.resolved_risks ?? "02"),
+              detail: "Low confidence fields",
+              icon: <ShieldCheck size={16} />,
+            },
+            {
+              title: "Audit Trail",
+              value: String(reportData?.audit_trail_events ?? "14"),
+              detail: "Events logged",
+              icon: <Clock size={16} />,
+            },
           ].map(({ title, value, detail, icon }) => (
             <Card key={title} size="sm">
               <CardHeader>
@@ -37,7 +139,7 @@ export function ReportPage() {
                   <span className="flex size-8 items-center justify-center rounded-md bg-secondary text-secondary-foreground">
                     {icon}
                   </span>
-                  <Badge variant="secondary" className="text-[10px]">Live</Badge>
+                  <Badge variant="secondary" className="text-[10px]">Verified</Badge>
                 </div>
               </CardHeader>
               <CardContent>
@@ -62,9 +164,9 @@ export function ReportPage() {
               </div>
             </CardHeader>
             <CardContent className="flex flex-col gap-3 pt-4">
-              <RiskLine label="Title Ownership" value="Clear" warning={false} />
-              <RiskLine label="Financial Exposure" value="Low" warning={false} />
-              <RiskLine label="Open Encumbrances" value="01 warning" warning />
+              <RiskLine label="Title Ownership" value={reportData?.summary?.title_ownership || "Clear"} warning={false} />
+              <RiskLine label="Financial Exposure" value={reportData?.summary?.financial_exposure || "Low"} warning={false} />
+              <RiskLine label="Open Encumbrances" value={reportData?.summary?.open_encumbrances || "01 warning"} warning />
             </CardContent>
           </Card>
 
@@ -73,15 +175,19 @@ export function ReportPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Audit Trail</p>
-                  <CardTitle className="mt-1">Reviewer Activity</CardTitle>
+                  <CardTitle className="mt-1">Reviewer Activity Log</CardTitle>
                 </div>
                 <Button variant="secondary" size="sm">Today</Button>
               </div>
             </CardHeader>
             <CardContent className="flex flex-col gap-4 pt-4">
-              <AuditRow time="08:14 AM" action="OCR extraction completed" user="AI Pipeline" />
-              <AuditRow time="09:02 AM" action="Title fields reviewed" user="Avery Johnson" />
-              <AuditRow time="09:46 AM" action="Risk flag resolved" user="Mia Rivera" />
+              {(reportData?.audit_trail || [
+                { time: "08:14 AM", action: "OCR extraction completed", user: "AI Pipeline" },
+                { time: "09:02 AM", action: "Title fields reviewed", user: "Avery Johnson" },
+                { time: "09:46 AM", action: "Risk flag resolved", user: "Mia Rivera" },
+              ]).map((item: any, idx: number) => (
+                <AuditRow key={idx} time={item.time} action={item.action} user={item.user} />
+              ))}
             </CardContent>
           </Card>
         </section>
@@ -114,5 +220,13 @@ function AuditRow({ time, action, user }: { time: string; action: string; user: 
         <div className="text-xs text-muted-foreground">{user}</div>
       </div>
     </div>
+  );
+}
+
+export function ReportPage() {
+  return (
+    <Suspense fallback={<div className="p-10 text-center"><Loader2 size={28} className="animate-spin mx-auto text-primary" /></div>}>
+      <ReportContent />
+    </Suspense>
   );
 }

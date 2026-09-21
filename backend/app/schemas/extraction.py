@@ -40,7 +40,12 @@ class ExtractionUpdate(BaseModel):
 class ReviewSubmission(BaseModel):
     validated_output: Dict[str, Any]
     review_notes: Optional[str] = None
-    decision: ExtractionStatusEnum
+    # Optional: a reviewer can save edits to the extracted fields without
+    # also finalizing approve/reject in the same action (the Review Workspace's
+    # "Save changes" vs "Approve"/"Flag for correction" are now separate
+    # actions) — see ReviewService.submit_document_review for what changes
+    # when this is omitted.
+    decision: Optional[ExtractionStatusEnum] = None
 
 class ExtractionResponse(ExtractionBase):
     id: UUID

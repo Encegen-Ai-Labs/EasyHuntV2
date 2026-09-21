@@ -61,8 +61,13 @@ class ReviewService:
         reviewer_id: str,
         validated_output: Dict[str, Any],
         review_notes: str | None,
-        decision: str,
+        decision: str | None = None,
     ) -> Dict[str, Any]:
+        """decision=None saves the reviewer's edits (validated_output/
+        review_notes) without finalizing approve/reject — lets a reviewer save
+        corrections to extracted fields as they go, separate from the final
+        approve/reject action. Passing "approved"/"rejected" behaves exactly
+        as before: persists the edits AND finalizes the document's status."""
         document = self.doc_repo.get_by_id(document_id)
         if not document:
             raise ResourceNotFoundError("Document not found")
@@ -71,22 +76,27 @@ class ReviewService:
         )
         if not extraction:
             raise ResourceNotFoundError("AI extraction not found for document")
-        if decision not in {"approved", "rejected"}:
-            raise PropertySystemException("Decision must be approved or rejected")
 
-        updated_extraction = self.extraction_repo.update(
-            "extractions",
-            {"id": extraction["id"]},
-            {
-                "validated_json_output": validated_output,
-                "human_correction": validated_output,
-                "review_notes": review_notes,
+        update_payload: Dict[str, Any] = {
+            "validated_json_output": validated_output,
+            "human_correction": validated_output,
+            "review_notes": review_notes,
+        }
+
+        updated_document = document
+        if decision is not None:
+            if decision not in {"approved", "rejected"}:
+                raise PropertySystemException("Decision must be approved or rejected")
+            update_payload.update({
                 "reviewed_by": reviewer_id,
                 "reviewed_at": datetime.now(timezone.utc).isoformat(),
                 "status": decision,
-            },
+            })
+            updated_document = self.doc_repo.update_status(document_id, decision)
+
+        updated_extraction = self.extraction_repo.update(
+            "extractions", {"id": extraction["id"]}, update_payload,
         )
-        updated_document = self.doc_repo.update_status(document_id, decision)
         return {
             "document": updated_document,
             "extraction": updated_extraction[0] if updated_extraction else None,

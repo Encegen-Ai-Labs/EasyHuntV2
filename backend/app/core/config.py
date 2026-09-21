@@ -29,6 +29,30 @@ class Settings(BaseSettings):
     ADMIN_EMAIL: str = Field(default="", validation_alias="ADMIN_EMAIL")
     ADMIN_PASSWORD: str = Field(default="", validation_alias="ADMIN_PASSWORD")
 
+    # ---- Document router (OCR vs VLM routing, app/services/document_router.py) ----
+    # Handwritten-area ratio at or above which a page is routed to the VLM instead
+    # of the (faster, cheaper) OCR path. ratio = handwritten box area / total box area.
+    ROUTER_HANDWRITING_THRESHOLD: float = Field(default=0.10, validation_alias="ROUTER_HANDWRITING_THRESHOLD")
+    # If OCR confidence on a page routed to OCR falls below this, the router
+    # escalates that page to the VLM rather than trust a low-confidence OCR read.
+    OCR_FALLBACK_CONFIDENCE: float = Field(default=0.70, validation_alias="OCR_FALLBACK_CONFIDENCE")
+    # Optional override for the Tesseract binary path — leave unset to resolve
+    # "tesseract" from PATH (pytesseract's default behavior).
+    TESSERACT_CMD_PATH: str = Field(default="", validation_alias="TESSERACT_CMD_PATH")
+
+    # Tesseract language models to load, "+"-joined (pytesseract's own format
+    # for multi-language OCR — it tries all of them per word/line and keeps
+    # the best match). Defaults to English plus the regional Indian scripts
+    # this app's own prompts (llm_extractor.py, page_extraction_service.py)
+    # already say these documents can be in. Without a non-English language
+    # pack actually installed for a given code here, Tesseract can't read
+    # that script at all — a page in it gets ~0 confidence regardless of
+    # scan/enhancement quality and always escalates to the VLM (see
+    # tesseract_provider.py). This only takes effect once the matching
+    # .traineddata files are installed in Tesseract's tessdata directory —
+    # changing this setting alone doesn't install them.
+    TESSERACT_LANGUAGES: str = Field(default="eng+hin+mar+tam+tel+kan", validation_alias="TESSERACT_LANGUAGES")
+
     model_config = SettingsConfigDict(
         env_file=str(ENV_FILE),
         env_file_encoding="utf-8",

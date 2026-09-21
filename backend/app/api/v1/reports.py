@@ -39,5 +39,5 @@ def get_report_download_url(
         return {"error": "Report not found"}
         
     # Generate signed, temporary download URL from private Supabase Storage bucket
-    res = db.storage.from_("reports").create_signed_url(report["file_path"], expires_in=3600)
+    res = db.storage.from_("reports").create_signed_url(report["pdf_path"], expires_in=3600)
     return {"download_url": res["signedURL"]}

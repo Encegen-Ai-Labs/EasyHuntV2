@@ -25,6 +25,12 @@ class BaseRepository:
             raise Exception(f"Insert failed on table {table}")
         return response.data[0]
 
+    def bulk_insert(self, table: str, rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        if not rows:
+            return []
+        response = self.client.table(table).insert(rows).execute()
+        return response.data
+
     def update(self, table: str, query_filters: Dict[str, Any], data: Dict[str, Any]) -> List[Dict[str, Any]]:
         builder = self.client.table(table).update(data)
         for key, val in query_filters.items():

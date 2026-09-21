@@ -6,6 +6,7 @@ from app.services.pipeline_service import PipelineService
 from app.repositories.case_repo import CaseRepository
 from app.repositories.doc_repo import DocumentRepository
 from app.repositories.flag_repo import FlagRepository
+from app.repositories.document_page_repo import DocumentPageRepository
 from app.dependencies.db import get_supabase_client
 from app.dependencies.auth import get_current_user, RoleRequirement
 from supabase import Client
@@ -16,16 +17,16 @@ def get_case_service(db: Client = Depends(get_supabase_client)) -> CaseService:
     return CaseService(CaseRepository(db))
 
 def get_pipeline_service(db: Client = Depends(get_supabase_client)) -> PipelineService:
-    return PipelineService(DocumentRepository(db), CaseRepository(db), FlagRepository(db))
+    return PipelineService(DocumentRepository(db), CaseRepository(db), FlagRepository(db), DocumentPageRepository(db))
 
 @router.post("", response_model=CaseResponse, status_code=status.HTTP_201_CREATED)
 def create_case(
     payload: CaseCreate,
-    current_user: Dict[str, Any] = Depends(RoleRequirement(["Vendor", "Admin"])),
+    current_user: Dict[str, Any] = Depends(RoleRequirement(["Reviewer", "Admin"])),
     service: CaseService = Depends(get_case_service)
 ):
     return service.create(
-        vendor_id=str(current_user["id"]),
+        creator_id=str(current_user["id"]),
         property_name=payload.property_name,
         survey_number=payload.survey_number,
         location=payload.location

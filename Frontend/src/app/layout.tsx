@@ -3,6 +3,8 @@ import "./globals.css";
 import { ReactQueryProvider } from "@/components/providers/ReactQueryProvider";
 import { AppNavigation } from "@/components/navigation/AppNavigation";
 import { ThemeProvider } from "@/components/theme-provider";
+import { AuthProvider } from "@/context/AuthContext";
+import { ToastProvider } from "@/context/ToastContext";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -29,8 +31,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           disableTransitionOnChange
         >
           <ReactQueryProvider>
-            <AppNavigation />
-            {children}
+            <ToastProvider>
+              <AuthProvider>
+                <AppNavigation />
+                {children}
+              </AuthProvider>
+            </ToastProvider>
           </ReactQueryProvider>
         </ThemeProvider>
       </body>

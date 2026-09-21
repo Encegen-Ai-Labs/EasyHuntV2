@@ -7,13 +7,6 @@ from datetime import datetime
 class RoleEnum(str, Enum):
     Admin = "Admin"
     Reviewer = "Reviewer"
-    Vendor = "Vendor"
-
-class UserRegister(BaseModel):
-    email: EmailStr
-    password: str = Field(..., min_length=8)
-    organisation_name: str
-    role: RoleEnum = RoleEnum.Vendor
 
 class ReviewerCreate(BaseModel):
     email: EmailStr

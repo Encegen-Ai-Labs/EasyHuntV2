@@ -51,22 +51,21 @@ def validate_extraction(extracted: Dict[str, Any]) -> Dict[str, Any]:
             low_confidence_fields.append(field_name)
 
     overall_conf = extracted.get("overall_confidence")
+    if _is_low_quality(overall_conf):
+        warnings.append(f"Overall extraction confidence is {overall_conf or 'unset'}")
 
     # Missing handwriting detection is treated conservatively and sent for review.
     is_handwritten = extracted.get("has_handwritten_content", True)
     if is_handwritten:
         warnings.append("Document contains handwritten content — flagged for review regardless of confidence")
 
-    needs_review = (
-        bool(errors)
-        or bool(low_confidence_fields)
-        or _is_low_quality(overall_conf)
-        or is_handwritten
-    )
-
     return {
         "is_valid": len(errors) == 0,
-        "needs_human_review": needs_review,
+        # These are legal documents — every extraction always goes to a human
+        # reviewer, not just the low-confidence/handwritten ones. errors/
+        # warnings/low_confidence_fields below still drive *why* a document
+        # needs a closer look, just not *whether* it needs review at all.
+        "needs_human_review": True,
         "reason_handwritten": is_handwritten,
         "errors": errors,
         "warnings": warnings,

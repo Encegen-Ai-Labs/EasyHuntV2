@@ -35,32 +35,87 @@ export function useCreateCaseMutation() {
   });
 }
 
-export function useExtractedFields() {
+export function useReviewDocuments(caseId: string) {
   return useQuery({
-    queryKey: ["cases", "extracted-fields"],
-    queryFn: apiClient.cases.getExtractedFields,
-    staleTime: 60_000,
+    queryKey: ["review", caseId, "documents"],
+    queryFn: () => apiClient.review.getCaseDocuments(caseId),
+    enabled: Boolean(caseId),
+    staleTime: 15_000,
   });
 }
 
-export function useLoginMutation() {
+export function useSubmitDocumentReviewMutation() {
+  const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ email, password }: { email: string; password: string }) =>
-      apiClient.auth.login(email, password),
-  });
-}
-
-export function useSignupMutation() {
-  return useMutation({
-    mutationFn: (payload: Parameters<typeof apiClient.auth.signup>[0]) =>
-      apiClient.auth.signup(payload),
+    mutationFn: ({
+      documentId,
+      caseId,
+      payload,
+    }: {
+      documentId: string;
+      caseId: string;
+      payload: { validated_output: Record<string, any>; review_notes?: string; decision?: "approved" | "rejected" };
+    }) => apiClient.review.submitDocumentReview(documentId, payload),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["review", variables.caseId, "documents"] });
+    },
   });
 }
 
 export function useUploadDocumentMutation() {
   return useMutation({
-    mutationFn: ({ caseId, file }: { caseId: string; file: File }) =>
-      apiClient.documents.upload(caseId, file),
+    mutationFn: ({ caseId, files }: { caseId: string; files: File[] }) =>
+      apiClient.documents.upload(caseId, files),
+  });
+}
+
+export function useDocumentPages(docId: string) {
+  return useQuery({
+    queryKey: ["documents", docId, "pages"],
+    queryFn: () => apiClient.documents.getPages(docId),
+    enabled: Boolean(docId),
+    staleTime: 15_000,
+  });
+}
+
+export function useTranslateDocumentMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (docId: string) => apiClient.documents.translate(docId),
+    onSuccess: (_data, docId) => {
+      // Both the search page-viewer (getPages) and the review documents list
+      // read english_text — invalidate whichever of these queries are mounted.
+      queryClient.invalidateQueries({ queryKey: ["documents", docId, "pages"] });
+      queryClient.invalidateQueries({ queryKey: ["review"] });
+    },
+  });
+}
+
+export function useUpdateDocumentPageMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      docId,
+      pageNumber,
+      updates,
+    }: {
+      docId: string;
+      pageNumber: number;
+      updates: { original_text?: string; english_text?: string };
+    }) => apiClient.documents.updatePageText(docId, pageNumber, updates),
+    onSuccess: (_data, { docId }) => {
+      // Same invalidation set as translate — a page-text edit affects the
+      // same two surfaces (this page-viewer, and the review documents list).
+      queryClient.invalidateQueries({ queryKey: ["documents", docId, "pages"] });
+      queryClient.invalidateQueries({ queryKey: ["review"] });
+    },
+  });
+}
+
+export function useEnhancedPageImageMutation() {
+  return useMutation({
+    mutationFn: ({ docId, pageNumber }: { docId: string; pageNumber: number }) =>
+      apiClient.documents.getEnhancedImageUrl(docId, pageNumber),
   });
 }
 

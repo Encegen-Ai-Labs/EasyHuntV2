@@ -1,6 +1,6 @@
 from pydantic import BaseModel
 from enum import Enum
-from typing import Optional
+from typing import List, Optional
 from uuid import UUID
 from datetime import datetime
 
@@ -28,3 +28,14 @@ class DocumentResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+class DocumentUploadResult(BaseModel):
+    """Outcome of one file within a batch upload — files are validated and
+    uploaded independently, so one bad file doesn't block the rest of the batch."""
+    file_name: str
+    success: bool
+    document: Optional[DocumentResponse] = None
+    error: Optional[str] = None
+
+class BatchUploadResponse(BaseModel):
+    results: List[DocumentUploadResult]

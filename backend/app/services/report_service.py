@@ -82,6 +82,11 @@ class ReportGenerationService:
         report_payload = {
             "case_id": case_id,
             "generated_by": user_id,
-            "file_path": storage_path
+            "pdf_path": storage_path,
+            # See report_builder_service.py's get_or_create_report() for why
+            # this must be explicit — the live table's approved_by column has
+            # a stray DEFAULT pointing at a nonexistent user, which fires (and
+            # breaks the insert) if this key is omitted.
+            "approved_by": None,
         }
         return self.report_repo.create_report(report_payload)

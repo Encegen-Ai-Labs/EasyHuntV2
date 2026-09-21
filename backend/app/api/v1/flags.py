@@ -3,12 +3,12 @@ from typing import List, Dict, Any, Optional
 from uuid import UUID
 
 from app.schemas.flags import FlagCreate, FlagResponse, FlagResolve, FlagStatusEnum
-from app.repositories.flag_repo import FlagRepository
+from app.repositories.flag_repo import FlagRepository, FLAGS_TABLE
 from app.services.review_service import ReviewService
 from app.repositories.case_repo import CaseRepository
 from app.dependencies.db import get_supabase_client, get_supabase_service_client
 from app.dependencies.auth import get_current_user, RoleRequirement
-from app.core.exceptions import ResourceNotFoundError, PermissionDeniedError
+from app.core.exceptions import ResourceNotFoundError
 from supabase import Client
 
 router = APIRouter(prefix="/flags", tags=["Flags Auditing & Automation"])
@@ -31,7 +31,6 @@ def list_flags(
     """
     Retrieve system and reviewer flags.
     - **Admin/Reviewer**: Can view all flags or filter dynamically.
-    - **Vendor**: Can only view flags belonging to their own property cases.
     """
     query_filters: Dict[str, Any] = {}
     if case_id:
@@ -39,27 +38,7 @@ def list_flags(
     if status:
         query_filters["status"] = status.value
 
-    # If vendor, strictly validate multi-tenant ownership boundaries
-    if current_user["role"] == "Vendor":
-        case_repo = CaseRepository(flag_repo.client)
-        if case_id:
-            case_obj = case_repo.get_by_id(str(case_id))
-            if not case_obj or case_obj["vendor_id"] != str(current_user["id"]):
-                raise PermissionDeniedError("Access to flags of this case is restricted.")
-            return flag_repo.select("flags", query_filters)
-        else:
-            # Vendor querying all flags -> explicitly fetch vendor cases first
-            vendor_cases = case_repo.list_by_vendor(str(current_user["id"]))
-            vendor_case_ids = [c["id"] for c in vendor_cases]
-            
-            # Perform query across vendor specific ownership array
-            builder = flag_repo.client.table("flags").select("*").in_("case_id", vendor_case_ids)
-            if status:
-                builder = builder.eq("status", status.value)
-            response = builder.execute()
-            return response.data
-
-    return flag_repo.select("flags", query_filters)
+    return flag_repo.select(FLAGS_TABLE, query_filters)
 
 @router.post("/{case_id}", response_model=FlagResponse, status_code=status.HTTP_201_CREATED)
 def raise_manual_flag(
@@ -97,7 +76,7 @@ def resolve_flag(
     Update flag resolution logs and modify status back to structured clear metrics.
     Restricted to **Reviewers** and **Admins**.
     """
-    flag_obj = review_service.flag_repo.select_one("flags", {"id": str(flag_id)})
+    flag_obj = review_service.flag_repo.select_one(FLAGS_TABLE, {"id": str(flag_id)})
     if not flag_obj:
         raise ResourceNotFoundError("Discrepancy flag identifier not found in cluster.")
 

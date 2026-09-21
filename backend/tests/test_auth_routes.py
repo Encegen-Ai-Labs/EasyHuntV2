@@ -23,36 +23,17 @@ class FakeUserRepository:
         return user_data
 
 
-def test_register_user_returns_token(monkeypatch):
-    monkeypatch.setattr("app.api.v1.auth.UserRepository", FakeUserRepository)
-    monkeypatch.setattr("app.api.v1.auth.get_password_hash", lambda password: "hashed-password")
-    monkeypatch.setattr("app.api.v1.auth.create_access_token", lambda data: "test-token")
-
+def test_register_endpoint_no_longer_exists(monkeypatch):
+    # Self-registration has been removed entirely — reviewer accounts are
+    # created only by an admin via POST /admin/reviewers (see test_admin_can_create_reviewer).
     app.dependency_overrides[get_supabase_client] = lambda: object()
 
     response = client.post(
         "/api/v1/auth/register",
-        json={"email": "new@example.com", "password": "password123", "role": "Vendor", "organisation_name": "Test Org"},
+        json={"email": "new@example.com", "password": "password123", "organisation_name": "Test Org"},
     )
 
-    assert response.status_code == 201
-    assert response.json()["user_id"]
-    assert response.json()["token"] == "test-token"
-
-    app.dependency_overrides.clear()
-
-
-def test_reviewer_registration_is_rejected(monkeypatch):
-    monkeypatch.setattr("app.api.v1.auth.UserRepository", FakeUserRepository)
-
-    app.dependency_overrides[get_supabase_client] = lambda: object()
-
-    response = client.post(
-        "/api/v1/auth/register",
-        json={"email": "reviewer@example.com", "password": "password123", "role": "Reviewer", "organisation_name": "Test Org"},
-    )
-
-    assert response.status_code == 403
+    assert response.status_code == 404
     app.dependency_overrides.clear()
 
 

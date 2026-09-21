@@ -5,7 +5,7 @@ import { UploadPage } from "@/components/screens/UploadPage";
 
 export default function DirectUploadPage() {
   return (
-    <ProtectedRoute allowedRoles={["Vendor", "Admin"]}>
+    <ProtectedRoute allowedRoles={["Reviewer", "Admin"]}>
       <UploadPage />
     </ProtectedRoute>
   );

@@ -49,7 +49,7 @@ def submit_document_review(
         reviewer_id=str(current_user["id"]),
         validated_output=payload.validated_output,
         review_notes=payload.review_notes,
-        decision=payload.decision.value,
+        decision=payload.decision.value if payload.decision else None,
     )
 
 @router.post("/flag/{flag_id}/resolve", response_model=FlagResponse)

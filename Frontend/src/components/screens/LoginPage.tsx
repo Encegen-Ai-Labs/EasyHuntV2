@@ -1,12 +1,12 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
+import { useState } from "react";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ArrowRight, CheckCircle2, FileCheck2, ShieldCheck, Unlock } from "lucide-react";
-import { useLoginMutation } from "@/services/api/hooks";
+import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -19,7 +19,8 @@ const loginSchema = z.object({
 
 export function LoginPage() {
   const router = useRouter();
-  const loginMutation = useLoginMutation();
+  const { login } = useAuth();
+  const [formError, setFormError] = useState<string | null>(null);
   const {
     register,
     handleSubmit,
@@ -27,11 +28,15 @@ export function LoginPage() {
   } = useForm({ resolver: zodResolver(loginSchema), defaultValues: { email: "", password: "" } });
 
   async function onSubmit(data: any) {
-    const result = await loginMutation.mutateAsync({ email: data.email, password: data.password });
+    setFormError(null);
+    // Goes through AuthContext.login() (not a raw API call) so isAuthenticated
+    // flips in React state immediately — a direct apiClient.auth.login() call
+    // here would leave the nav/session looking logged-out until a full reload.
+    const result = await login(data.email, data.password);
     if (result.success) {
       router.push("/dashboard");
     } else {
-      console.error(result.error);
+      setFormError(result.error || "Invalid login credentials");
     }
   }
 
@@ -124,6 +129,12 @@ export function LoginPage() {
                     <a href="#" className="text-xs font-semibold hover:underline">Forgot password?</a>
                   </div>
 
+                  {formError && (
+                    <p className="rounded-md bg-destructive/10 px-3 py-2 text-xs font-medium text-destructive">
+                      {formError}
+                    </p>
+                  )}
+
                   <Button type="submit" className="w-full" disabled={isSubmitting}>
                     {isSubmitting ? "Signing in…" : "Continue to workspace"}
                     <ArrowRight data-icon="inline-end" />
@@ -141,9 +152,8 @@ export function LoginPage() {
                   <Button variant="outline" className="w-full">Microsoft</Button>
                 </div>
 
-                <p className="mt-5 text-center text-sm text-muted-foreground">
-                  New to PropVerify AI?{" "}
-                  <Link href="/signup" className="font-semibold hover:underline">Create account</Link>
+                <p className="mt-5 text-center text-xs text-muted-foreground">
+                  Reviewer accounts are created by an administrator.
                 </p>
               </CardContent>
             </Card>

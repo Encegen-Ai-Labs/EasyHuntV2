@@ -8,8 +8,15 @@ class CaseRepository(BaseRepository):
     def get_by_id(self, case_id: str) -> Optional[Dict[str, Any]]:
         return self.select_one("cases", {"id": case_id})
 
-    def list_by_vendor(self, vendor_id: str) -> List[Dict[str, Any]]:
-        return self.select("cases", {"vendor_id": vendor_id})
+    def list_owned_by(self, user_id: str) -> List[Dict[str, Any]]:
+        """Cases the given reviewer created or has been assigned to (admin-set reviewer_id)."""
+        response = (
+            self.client.table("cases")
+            .select("*")
+            .or_(f"created_by.eq.{user_id},reviewer_id.eq.{user_id}")
+            .execute()
+        )
+        return response.data
 
     def list_by_reviewer(self, reviewer_id: str) -> List[Dict[str, Any]]:
         return self.select("cases", {"reviewer_id": reviewer_id})

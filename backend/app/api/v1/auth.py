@@ -1,52 +1,21 @@
-from datetime import datetime, timezone
 from typing import Any, Dict
-from uuid import uuid4
 
 from fastapi import APIRouter, Depends
-from fastapi import status
 
 from app.core.config import settings
-from app.core.exceptions import AuthenticationError, PermissionDeniedError
-from app.core.security import create_access_token, get_password_hash, verify_password
+from app.core.exceptions import AuthenticationError
+from app.core.security import create_access_token, verify_password
 from app.dependencies.db import get_supabase_client
 from app.repositories.user_repo import UserRepository
-from app.schemas.auth import RoleEnum, UserLogin, UserRegister
+from app.schemas.auth import RoleEnum, UserLogin
 from supabase import Client
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
-
-@router.post("/register", status_code=status.HTTP_201_CREATED)
-async def register_user(
-    payload: UserRegister,
-    db: Client = Depends(get_supabase_client),
-):
-    repo = UserRepository(db)
-    existing_user = repo.get_by_email(str(payload.email))
-    if existing_user:
-        raise AuthenticationError("User already exists")
-
-    if payload.role == RoleEnum.Reviewer:
-        raise PermissionDeniedError("Reviewers cannot self-register. Please contact an admin.")
-
-    hashed_password = get_password_hash(payload.password)
-    
-    user_data: Dict[str, Any] = {
-        "email": str(payload.email),
-        "password": hashed_password,
-        "role": payload.role.value,
-        "organisation_name": payload.organisation_name,
-        "created_at": datetime.now(timezone.utc).isoformat(),
-    }
-
-    created_user = repo.create_user(user_data)
-    token = create_access_token({"sub": created_user["id"], "role": created_user["role"]})
-
-    return {
-        "user_id": created_user["id"],
-        "email": created_user["email"],
-        "token": token,
-    }
+# Self-registration has been removed. Reviewer accounts are created exclusively
+# by an admin via POST /admin/reviewers (app/api/v1/admin.py). Admin access is
+# granted only through the ADMIN_EMAIL/ADMIN_PASSWORD environment credentials
+# checked in login_user() below.
 
 
 @router.post("/login")
@@ -76,11 +45,11 @@ async def login_user(
     if not stored_hash or not verify_password(payload.password, stored_hash):
         raise AuthenticationError("Invalid credentials")
 
-    token = create_access_token({"sub": user["id"], "role": user.get("role", "Vendor")})
+    token = create_access_token({"sub": user["id"], "role": user.get("role", "Reviewer")})
 
     return {
         "access_token": token,
         "user_id": user["id"],
         "email": user.get("email"),
-        "role": user.get("role", "Vendor"),
+        "role": user.get("role", "Reviewer"),
     }

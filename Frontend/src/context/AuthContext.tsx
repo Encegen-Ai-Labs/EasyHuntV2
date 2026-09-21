@@ -4,7 +4,7 @@ import React, { createContext, useContext, useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { apiClient } from "@/services/api/client";
 
-export type UserRole = "Vendor" | "Reviewer" | "Admin";
+export type UserRole = "Reviewer" | "Admin";
 
 export interface User {
   id: string;
@@ -20,7 +20,6 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
-  signup: (data: { email: string; password: string; name?: string }) => Promise<{ success: boolean; error?: string }>;
   logout: () => Promise<void>;
   hasRole: (allowedRoles: string[]) => boolean;
   accessDeniedModal: {
@@ -63,7 +62,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setUser({
             id: localStorage.getItem("propverify_user_id") || "1",
             email: "user@propverify.ai",
-            role: (storedRole as UserRole) || "Vendor",
+            role: (storedRole as UserRole) || "Reviewer",
           });
         }
       }
@@ -111,7 +110,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const formattedUser: User = {
         id: result.user.id,
         email: result.user.email,
-        role: (result.user.role as UserRole) || "Vendor",
+        role: (result.user.role as UserRole) || "Reviewer",
         name: result.user.email.split("@")[0],
       };
 
@@ -125,28 +124,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return { success: true };
     }
     return { success: false, error: result.error || "Login failed" };
-  }
-
-  async function signup(data: { email: string; password: string; name?: string }) {
-    const result = await apiClient.auth.signup(data);
-    if (result.success) {
-      if (result.user && result.token) {
-        const formattedUser: User = {
-          id: result.user.id,
-          email: result.user.email,
-          role: "Vendor",
-          name: data.name || result.user.name || result.user.email.split("@")[0],
-        };
-        setToken(result.token);
-        setUser(formattedUser);
-        localStorage.setItem(TOKEN_KEY, result.token);
-        localStorage.setItem(USER_KEY, JSON.stringify(formattedUser));
-        localStorage.setItem("propverify_role", formattedUser.role);
-        localStorage.setItem("propverify_user_id", formattedUser.id);
-      }
-      return { success: true };
-    }
-    return { success: false, error: result.error || "Signup failed" };
   }
 
   async function logout() {
@@ -178,7 +155,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isAuthenticated: !!token && !!user,
         isLoading,
         login,
-        signup,
         logout,
         hasRole,
         accessDeniedModal: {

@@ -2,23 +2,28 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, FileCheck2, Home, ListChecks, UploadCloud, UserRound } from "lucide-react";
+import { BarChart3, FileCheck2, Home, ListChecks, LogOut, UserRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/context/AuthContext";
 
+// Upload/Status/Review/Report were removed from here (2026-08-21, user's
+// explicit request) — each pointed at a hardcoded demo case id
+// ("/cases/PV-2408/...") regardless of which case was actually open, and
+// each screen is reachable through the real per-case flow instead: Upload
+// via a case's workspace (CaseWorkspacePage.tsx), Review via "Open Review
+// Workspace" there, Report via the Report Builder link on the review page
+// (ReviewPage.tsx, see item 9).
 const navItems = [
   { href: "/", label: "Home", icon: Home },
   { href: "/dashboard", label: "Dashboard", icon: BarChart3 },
   { href: "/cases", label: "Cases", icon: ListChecks },
-  { href: "/cases/upload", label: "Upload", icon: UploadCloud },
-  { href: "/cases/PV-2408/status", label: "Status", icon: FileCheck2 },
-  { href: "/cases/PV-2408/review", label: "Review", icon: FileCheck2 },
-  { href: "/cases/PV-2408/report", label: "Report", icon: FileCheck2 },
 ];
 
 export function AppNavigation() {
   const pathname = usePathname();
+  const { user, isAuthenticated, isLoading, logout } = useAuth();
 
   return (
     <header className="sticky top-0 z-50 border-b bg-background/80 backdrop-blur-md">
@@ -59,13 +64,32 @@ export function AppNavigation() {
 
         <div className="flex items-center gap-2">
           <ThemeToggle />
-          <Button variant="ghost" size="sm" className="hidden md:inline-flex" render={<Link href="/login" />}>
-            Login
-          </Button>
-          <Button size="sm" render={<Link href="/signup" />}>
-            <UserRound data-icon="inline-start" />
-            Workspace
-          </Button>
+          {!isLoading && isAuthenticated ? (
+            <>
+              <span className="hidden items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium text-muted-foreground md:inline-flex">
+                <UserRound size={13} />
+                {user?.email}
+              </span>
+              <Button size="sm" nativeButton={false} render={<Link href="/dashboard" />}>
+                <BarChart3 data-icon="inline-start" />
+                Workspace
+              </Button>
+              <Button variant="ghost" size="sm" onClick={() => logout()}>
+                <LogOut data-icon="inline-start" />
+                Logout
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button variant="ghost" size="sm" className="hidden md:inline-flex" nativeButton={false} render={<Link href="/login" />}>
+                Login
+              </Button>
+              <Button size="sm" nativeButton={false} render={<Link href="/login" />}>
+                <UserRound data-icon="inline-start" />
+                Workspace
+              </Button>
+            </>
+          )}
         </div>
       </div>
     </header>

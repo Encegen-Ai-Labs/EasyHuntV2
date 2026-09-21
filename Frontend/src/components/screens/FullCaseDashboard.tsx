@@ -108,7 +108,7 @@ export function FullCaseDashboard() {
                     <TableRow key={c.id}>
                       <TableCell>
                         <div className="font-medium">{c.title}</div>
-                        <div className="text-xs text-muted-foreground">{c.id} • {c.address}</div>
+                        <div className="text-xs text-muted-foreground">{c.address}</div>
                       </TableCell>
                       <TableCell><Badge variant="secondary">Ready</Badge></TableCell>
                       <TableCell>

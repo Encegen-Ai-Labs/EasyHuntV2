@@ -39,11 +39,11 @@ export function HomePage() {
             </p>
             
             <div className="mt-10 flex flex-wrap items-center gap-4">
-              <Button size="lg" className="h-12 px-8 rounded-full bg-white text-black hover:bg-slate-200 transition-all hover:scale-105 hover:shadow-[0_0_20px_-5px_rgba(255,255,255,0.4)]" render={<Link href="/cases/new" />}>
+              <Button size="lg" className="h-12 px-8 rounded-full bg-white text-black hover:bg-slate-200 transition-all hover:scale-105 hover:shadow-[0_0_20px_-5px_rgba(255,255,255,0.4)]" nativeButton={false} render={<Link href="/cases/new" />}>
                 Open a case
                 <ArrowRight className="ml-2 size-4" />
               </Button>
-              <Button variant="outline" size="lg" className="h-12 px-8 rounded-full border-white/20 bg-white/5 backdrop-blur-md hover:bg-white/10 transition-all" render={<Link href="/dashboard" />}>
+              <Button variant="outline" size="lg" className="h-12 px-8 rounded-full border-white/20 bg-white/5 backdrop-blur-md hover:bg-white/10 transition-all" nativeButton={false} render={<Link href="/dashboard" />}>
                 Review desk
               </Button>
             </div>
@@ -148,7 +148,7 @@ export function HomePage() {
               Every field extracted is linked to its source document with high-confidence bounding boxes, ensuring full traceability.
             </p>
             <div className="mt-6">
-              <Button variant="secondary" className="rounded-full bg-white/10 hover:bg-white/20" render={<Link href="/cases/new" />}>
+              <Button variant="secondary" className="rounded-full bg-white/10 hover:bg-white/20" nativeButton={false} render={<Link href="/cases/new" />}>
                 Start a free analysis
               </Button>
             </div>

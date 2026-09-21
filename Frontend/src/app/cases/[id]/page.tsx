@@ -5,7 +5,7 @@ import { CaseWorkspacePage } from "@/components/screens/CaseWorkspacePage";
 
 export default function CaseWorkspaceRoutePage() {
   return (
-    <ProtectedRoute allowedRoles={["Vendor", "Reviewer", "Admin"]}>
+    <ProtectedRoute allowedRoles={["Reviewer", "Admin"]}>
       <CaseWorkspacePage />
     </ProtectedRoute>
   );

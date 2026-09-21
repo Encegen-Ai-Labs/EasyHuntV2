@@ -14,11 +14,11 @@ import {
   Search,
   UserCheck,
 } from "lucide-react";
-import { apiClient, UserRecord, CaseRecord } from "@/services/api/client";
+import { apiClient, type UserRecord, type CaseRecord } from "@/services/api/client";
 import { useToast } from "@/context/ToastContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Input } from "@/components/ui/Input";
+import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import {
   Table,
@@ -55,13 +55,13 @@ export function UserManagementPage() {
     try {
       const [usersData, casesRes] = await Promise.all([
         apiClient.admin.getUsers(),
-        apiClient.cases.list(),
+        apiClient.dashboard.getCases(),
       ]);
       setUsers(usersData || []);
       setCases(casesRes.data || []);
     } catch (err: any) {
       toast.error(err.message || "Failed to load directory data", "Error");
-    } fontId: {
+    } finally {
       setIsLoadingUsers(false);
     }
   }
@@ -105,7 +105,8 @@ export function UserManagementPage() {
     setAssigningCaseId(caseId);
     try {
       await apiClient.admin.assignReviewer(caseId, reviewerId);
-      toast.success(`Reassigned case ${caseId} to reviewer`, "Reviewer Assigned");
+      const caseTitle = cases.find((c) => c.id === caseId)?.title || "case";
+      toast.success(`Reassigned ${caseTitle} to reviewer`, "Reviewer Assigned");
       loadData();
     } catch (err: any) {
       toast.error(err.message || "Failed to assign reviewer", "Assignment Error");
@@ -152,7 +153,7 @@ export function UserManagementPage() {
             <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
               <div>
                 <CardTitle className="text-lg">User Directory</CardTitle>
-                <CardDescription>System accounts across Vendor, Reviewer, and Admin roles.</CardDescription>
+                <CardDescription>System accounts across Reviewer and Admin roles.</CardDescription>
               </div>
               <div className="relative">
                 <Search className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
@@ -198,13 +199,7 @@ export function UserManagementPage() {
                       </TableCell>
                       <TableCell>
                         <Badge
-                          variant={
-                            u.role.toLowerCase() === "admin"
-                              ? "destructive"
-                              : u.role.toLowerCase() === "reviewer"
-                              ? "default"
-                              : "secondary"
-                          }
+                          variant={u.role.toLowerCase() === "admin" ? "destructive" : "default"}
                           className="text-[10px] font-bold uppercase"
                         >
                           {u.role}
@@ -239,7 +234,7 @@ export function UserManagementPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Case Title & ID</TableHead>
+                  <TableHead>Case Title</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Current Assignee</TableHead>
                   <TableHead>Assign Reviewer</TableHead>
@@ -250,7 +245,7 @@ export function UserManagementPage() {
                   <TableRow key={c.id}>
                     <TableCell>
                       <div className="font-semibold">{c.title}</div>
-                      <div className="text-xs text-muted-foreground">{c.id} · {c.address}</div>
+                      <div className="text-xs text-muted-foreground">{c.address}</div>
                     </TableCell>
                     <TableCell>
                       <Badge variant="outline">{c.status}</Badge>

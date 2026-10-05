@@ -574,6 +574,174 @@ def test_pipeline_keeps_document_processing_when_extraction_fails(monkeypatch):
     assert doc_repo.doc["status"] == "flagged"
 
 
+def test_pipeline_persists_llm_red_flags_tagged_by_source(monkeypatch):
+    # Phase 1 (docs/ROADMAP.md): red flags the extraction LLM reports in
+    # extracted["red_flags"] (llm_extractor.py's new schema field) get
+    # persisted into risk_flags via flag_repo, tagged source="llm" and
+    # scoped to the specific document they came from.
+    doc_repo = FakeDocRepo({"id": "doc-1", "case_id": "case-1", "file_path": "cases/case-1/test.pdf", "status": "processing"})
+    case_repo = FakeCaseRepo({"id": "case-1", "created_by": "reviewer-1"})
+    flag_repo = FakeFlagRepo()
+    service = PipelineService(doc_repo, case_repo, flag_repo, FakeDocumentPageRepo())
+
+    _patch_routed_pipeline(monkeypatch, extracted_overrides={
+        "red_flags": [
+            {
+                "type": "litigation",
+                "description": "Document references an ongoing suit over the property.",
+                "severity": "high",
+                "source_text": "subject to pending Civil Suit No. 45/2019",
+            },
+        ],
+    })
+
+    result = service.execute_analysis_pipeline("doc-1")
+
+    assert result["status"] == "success"
+    llm_flags = [f for f in flag_repo.flags if f["source"] == "llm"]
+    assert len(llm_flags) == 1
+    flag = llm_flags[0]
+    assert flag["flag_type"] == "Litigation"
+    assert flag["severity"] == "high"
+    assert flag["case_id"] == "case-1"
+    assert flag["document_id"] == "doc-1"
+    assert "subject to pending Civil Suit No. 45/2019" in flag["description"]
+    assert flag["status"] == "raised"
+
+
+def test_pipeline_skips_red_flags_when_none_reported(monkeypatch):
+    doc_repo = FakeDocRepo({"id": "doc-1", "case_id": "case-1", "file_path": "cases/case-1/test.pdf", "status": "processing"})
+    case_repo = FakeCaseRepo({"id": "case-1", "created_by": "reviewer-1"})
+    flag_repo = FakeFlagRepo()
+    service = PipelineService(doc_repo, case_repo, flag_repo, FakeDocumentPageRepo())
+
+    _patch_routed_pipeline(monkeypatch, extracted_overrides={"red_flags": []})
+
+    service.execute_analysis_pipeline("doc-1")
+
+    assert [f for f in flag_repo.flags if f["source"] == "llm"] == []
+
+
+def test_pipeline_ignores_malformed_red_flags_without_failing(monkeypatch, caplog):
+    # red_flags is untrusted model output — a malformed shape (wrong type
+    # entirely, or entries missing required keys) must be logged and
+    # skipped, never crash the pipeline or lose an otherwise-successful
+    # extraction.
+    doc_repo = FakeDocRepo({"id": "doc-1", "case_id": "case-1", "file_path": "cases/case-1/test.pdf", "status": "processing"})
+    case_repo = FakeCaseRepo({"id": "case-1", "created_by": "reviewer-1"})
+    flag_repo = FakeFlagRepo()
+    service = PipelineService(doc_repo, case_repo, flag_repo, FakeDocumentPageRepo())
+
+    _patch_routed_pipeline(monkeypatch, extracted_overrides={
+        "red_flags": "not a list",
+    })
+
+    with caplog.at_level("ERROR"):
+        result = service.execute_analysis_pipeline("doc-1")
+
+    assert result["status"] == "success"
+    assert [f for f in flag_repo.flags if f["source"] == "llm"] == []
+    assert any("pipeline.red_flags_malformed" in record.message for record in caplog.records)
+
+
+def test_pipeline_normalizes_unknown_red_flag_type_and_severity(monkeypatch):
+    doc_repo = FakeDocRepo({"id": "doc-1", "case_id": "case-1", "file_path": "cases/case-1/test.pdf", "status": "processing"})
+    case_repo = FakeCaseRepo({"id": "case-1", "created_by": "reviewer-1"})
+    flag_repo = FakeFlagRepo()
+    service = PipelineService(doc_repo, case_repo, flag_repo, FakeDocumentPageRepo())
+
+    _patch_routed_pipeline(monkeypatch, extracted_overrides={
+        "red_flags": [
+            {"type": "not_a_real_type", "description": "Something odd.", "severity": "urgent!!"},
+        ],
+    })
+
+    service.execute_analysis_pipeline("doc-1")
+
+    llm_flags = [f for f in flag_repo.flags if f["source"] == "llm"]
+    assert len(llm_flags) == 1
+    assert llm_flags[0]["flag_type"] == "Other Red Flag"
+    # Unrecognized severity defaults to "high", not "medium" — fail toward
+    # more scrutiny, matching has_handwritten_content's fail-safe True.
+    assert llm_flags[0]["severity"] == "high"
+
+
+def test_pipeline_fails_document_when_extraction_insert_fails(monkeypatch, caplog):
+    # Regression guard: before this insert was wrapped, a failure here would
+    # raise straight out of execute_analysis_pipeline. Reached via a
+    # BackgroundTask from POST /documents/{id}/process (see documents.py),
+    # an uncaught exception there never surfaces as an HTTP error at all —
+    # the document is just silently stuck "processing" forever. This test
+    # checks it now fails visibly (status="failed", doc marked "flagged",
+    # logged) and that nothing downstream (pages, chain, flags) is attempted
+    # once the primary extraction record couldn't be saved.
+    doc_repo = FakeDocRepo({"id": "doc-1", "case_id": "case-1", "file_path": "cases/case-1/test.pdf", "status": "processing"})
+    case_repo = FakeCaseRepo({"id": "case-1", "created_by": "reviewer-1"})
+    flag_repo = FakeFlagRepo()
+    doc_page_repo = FakeDocumentPageRepo()
+    service = PipelineService(doc_repo, case_repo, flag_repo, doc_page_repo)
+
+    _patch_routed_pipeline(monkeypatch, extracted_overrides={
+        "chain": [{"order": 1, "owner": "Ramesh Patil", "date": "1990-03-15", "type": "Sale Deed", "survey": "SY-1"}],
+    })
+
+    def flaky_insert(table, data):
+        if table == "extractions":
+            raise Exception("simulated DB error: could not find column")
+        return data
+
+    monkeypatch.setattr(service.generic_repo, "insert", flaky_insert)
+
+    with caplog.at_level("ERROR"):
+        result = service.execute_analysis_pipeline("doc-1")
+
+    assert result["status"] == "failed"
+    assert result["document_id"] == "doc-1"
+    assert doc_repo.doc["status"] == "flagged"
+    assert doc_page_repo.created_pages == []
+    assert flag_repo.flags == []
+    assert any("pipeline.extraction_insert_failed" in r.message for r in caplog.records)
+
+
+def test_pipeline_one_ownership_chain_insert_failure_does_not_lose_others(monkeypatch, caplog):
+    # Regression guard: before this loop was per-item, one failing chain
+    # insert raised out of the whole for loop, silently dropping every
+    # chain record after the failing one (caught one level up, so it didn't
+    # crash the pipeline — but still lost sibling records it shouldn't
+    # have).
+    doc_repo = FakeDocRepo({"id": "doc-1", "case_id": "case-1", "file_path": "cases/case-1/test.pdf", "status": "processing"})
+    case_repo = FakeCaseRepo({"id": "case-1", "created_by": "reviewer-1"})
+    flag_repo = FakeFlagRepo()
+    service = PipelineService(doc_repo, case_repo, flag_repo, FakeDocumentPageRepo())
+
+    _patch_routed_pipeline(monkeypatch, extracted_overrides={
+        "chain": [
+            {"order": 1, "owner": "Ramesh Patil", "date": "1990-03-15", "type": "Sale Deed", "survey": "SY-1"},
+            {"order": 2, "owner": "Suresh Kumar", "date": "2001-07-22", "type": "Gift Deed", "survey": "SY-1"},
+        ],
+    })
+
+    inserted_chain_records = []
+    original_insert = service.generic_repo.insert
+
+    def flaky_insert(table, data):
+        if table == "ownership_chain":
+            if data.get("owner_name") == "Ramesh Patil":
+                raise Exception("simulated DB error")
+            inserted_chain_records.append(data)
+            return data
+        return original_insert(table, data)
+
+    monkeypatch.setattr(service.generic_repo, "insert", flaky_insert)
+
+    with caplog.at_level("ERROR"):
+        result = service.execute_analysis_pipeline("doc-1")
+
+    assert result["status"] == "success"
+    assert [r["owner_name"] for r in inserted_chain_records] == ["Suresh Kumar"]
+    assert any("pipeline.ownership_chain_insert_failed" in r.message for r in caplog.records)
+
+
 def test_finalize_review_marks_documents_completed():
     case_repo = FakeCaseRepo({"id": "case-1", "created_by": "reviewer-1", "status": "review"})
     flag_repo = FakeFlagRepo()

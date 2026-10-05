@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import { ChevronDown, ChevronUp, FileText, Loader2, Search, Sparkles } from "lucide-react";
-import { apiClient, type DocumentPageRecord, type SearchMode, type SearchResult } from "@/services/api/client";
+import { apiClient, type DocumentPageRecord, type SearchResult } from "@/services/api/client";
 import { useToast } from "@/context/ToastContext";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -26,7 +26,6 @@ interface ExpandedPageState {
 export function CaseSearchPanel({ caseId, onExcerptAdded }: CaseSearchPanelProps) {
   const toast = useToast();
   const [query, setQuery] = useState("");
-  const [mode, setMode] = useState<SearchMode>("exact");
   const [submittedQuery, setSubmittedQuery] = useState("");
   const [isSearching, setIsSearching] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
@@ -43,7 +42,14 @@ export function CaseSearchPanel({ caseId, onExcerptAdded }: CaseSearchPanelProps
     setSubmittedQuery(trimmed);
     setExpanded({});
 
-    const result = await apiClient.search.searchCase(caseId, trimmed, mode);
+    // Search mode is hardcoded to "exact" — semantic search exists and is
+    // fully wired on the backend (search_service.py's mode="semantic" path,
+    // document_pages.embedding, the match_document_pages RPC) but is ahead
+    // of the current SOP-8 scope ("exact match first, no fuzzy or semantic
+    // matching yet" — see docs/DECISIONS.md D5). Re-enabling it later is a
+    // one-line change here plus restoring the mode toggle UI below; nothing
+    // on the backend needs to change.
+    const result = await apiClient.search.searchCase(caseId, trimmed, "exact");
     setResults(result.success && result.data ? result.data.results : []);
     setIsSearching(false);
   }
@@ -115,29 +121,6 @@ export function CaseSearchPanel({ caseId, onExcerptAdded }: CaseSearchPanelProps
           {isSearching ? <Loader2 size={16} className="animate-spin" /> : "Search"}
         </Button>
       </form>
-
-      <div className="flex items-center gap-1 text-xs">
-        <span className="text-muted-foreground">Match:</span>
-        <Button
-          type="button"
-          size="sm"
-          variant={mode === "exact" ? "secondary" : "ghost"}
-          className="h-7 px-2.5 text-xs"
-          onClick={() => setMode("exact")}
-        >
-          Exact
-        </Button>
-        <Button
-          type="button"
-          size="sm"
-          variant={mode === "semantic" ? "secondary" : "ghost"}
-          className="h-7 px-2.5 text-xs"
-          onClick={() => setMode("semantic")}
-        >
-          <Sparkles size={12} data-icon="inline-start" />
-          Similar meaning
-        </Button>
-      </div>
 
       {isSearching && (
         <div className="flex items-center justify-center gap-2 py-8 text-xs text-muted-foreground">

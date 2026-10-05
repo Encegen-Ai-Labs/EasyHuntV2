@@ -65,6 +65,23 @@ export interface DocumentPagesResponse {
   pages: DocumentPageRecord[];
 }
 
+export type FlagSeverity = "low" | "medium" | "high" | "critical";
+export type FlagStatus = "raised" | "resolved" | "ignored";
+export type FlagSource = "llm" | "structural";
+
+export interface FlagRecord {
+  id: string;
+  case_id: string;
+  document_id?: string | null;
+  flag_type: string;
+  severity: FlagSeverity;
+  description: string;
+  status: FlagStatus;
+  source: FlagSource;
+  resolved_by?: string | null;
+  resolution_notes?: string | null;
+}
+
 export type SearchMode = "exact" | "semantic";
 
 export interface SearchResult {
@@ -508,7 +525,7 @@ export const apiClient = {
   },
 
   flags: {
-    list: async (caseId?: string) => {
+    list: async (caseId?: string): Promise<{ success: boolean; data?: FlagRecord[]; error?: string }> => {
       try {
         const url = new URL(`${API_BASE_URL}/flags`);
         if (caseId) url.searchParams.append("case_id", caseId);
@@ -523,7 +540,11 @@ export const apiClient = {
       }
     },
 
-    resolve: async (flagId: string, resolutionNotes: string, status = "resolved") => {
+    resolve: async (
+      flagId: string,
+      resolutionNotes: string,
+      status: string = "resolved"
+    ): Promise<{ success: boolean; data?: FlagRecord; error?: string }> => {
       try {
         const res = await fetch(`${API_BASE_URL}/flags/${flagId}/resolve`, {
           method: "PUT",

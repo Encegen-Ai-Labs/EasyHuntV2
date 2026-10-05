@@ -1,7 +1,6 @@
 "use client";
 
 import { AlertTriangle, ArrowUp, CheckCircle2, FileCheck2, FileSearch, Search } from "lucide-react";
-import { PdfDownloadButton } from "@/components/ui/PdfDownloadButton";
 import { useDashboardCases } from "@/services/api/hooks";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -38,7 +37,6 @@ export function FullCaseDashboard() {
           </div>
           <div className="flex items-center gap-2">
             <Button variant="outline" size="sm">Filter</Button>
-            <PdfDownloadButton label="Export Summary" />
           </div>
         </div>
 

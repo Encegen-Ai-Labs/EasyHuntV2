@@ -10,7 +10,6 @@ import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
 
 const loginSchema = z.object({
   email: z.string().email("Enter a valid email address"),
@@ -140,17 +139,6 @@ export function LoginPage() {
                     <ArrowRight data-icon="inline-end" />
                   </Button>
                 </form>
-
-                <div className="my-5 flex items-center gap-3">
-                  <Separator className="flex-1" />
-                  <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">or continue with</span>
-                  <Separator className="flex-1" />
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <Button variant="outline" className="w-full">Google</Button>
-                  <Button variant="outline" className="w-full">Microsoft</Button>
-                </div>
 
                 <p className="mt-5 text-center text-xs text-muted-foreground">
                   Reviewer accounts are created by an administrator.

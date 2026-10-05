@@ -47,22 +47,6 @@ export function HomePage() {
                 Review desk
               </Button>
             </div>
-            
-            {/* Quick Metrics */}
-            <div className="mt-16 flex gap-10 border-t border-border pt-8">
-              <div className="flex flex-col">
-                <span className="text-3xl font-bold text-white tracking-tight">226</span>
-                <span className="mt-1 text-xs font-semibold uppercase tracking-widest text-muted-foreground">Cases Checked</span>
-              </div>
-              <div className="flex flex-col">
-                <span className="text-3xl font-bold text-white tracking-tight">2.3k</span>
-                <span className="mt-1 text-xs font-semibold uppercase tracking-widest text-muted-foreground">Docs Indexed</span>
-              </div>
-              <div className="flex flex-col hidden sm:flex">
-                <span className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-emerald-600 tracking-tight">100%</span>
-                <span className="mt-1 text-xs font-semibold uppercase tracking-widest text-muted-foreground">Confidence</span>
-              </div>
-            </div>
           </div>
 
           {/* 3D Glassmorphism Image / Dashboard Preview */}
@@ -195,46 +179,21 @@ export function HomePage() {
 
           <div className="relative rounded-[2rem] border border-white/10 bg-black/40 p-8 shadow-2xl backdrop-blur-xl">
             <h3 className="text-xl font-bold text-white mb-6">Review Pipeline</h3>
-            <div className="space-y-6">
-              
-              <div>
-                <div className="flex justify-between text-sm font-medium text-white mb-3">
-                  <span>OCR Processing</span>
-                  <span className="text-emerald-400">100%</span>
+            <div className="space-y-5">
+              {[
+                { title: "Intake", detail: "Batch upload, image enhancement, OCR/VLM routing" },
+                { title: "Extraction", detail: "Owners, dates, survey numbers, chain of title" },
+                { title: "Audit", detail: "Handwriting confirmation, red-flag review" },
+                { title: "Report", detail: "Reviewer-selected excerpts, exported to the bank's format" },
+              ].map(({ title, detail }) => (
+                <div key={title} className="flex items-start gap-3 rounded-xl border border-white/5 bg-white/[0.03] p-4">
+                  <span className="mt-0.5 h-2 w-2 shrink-0 rounded-full bg-emerald-500" />
+                  <div>
+                    <p className="text-sm font-semibold text-white">{title}</p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">{detail}</p>
+                  </div>
                 </div>
-                <div className="h-2 overflow-hidden rounded-full bg-white/10">
-                  <div className="h-full w-full rounded-full bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.8)]" />
-                </div>
-              </div>
-
-              <div>
-                <div className="flex justify-between text-sm font-medium text-white mb-3">
-                  <span>Entity Extraction</span>
-                  <span className="text-indigo-400">82%</span>
-                </div>
-                <div className="h-2 overflow-hidden rounded-full bg-white/10">
-                  <div className="h-full w-[82%] rounded-full bg-indigo-500 shadow-[0_0_10px_rgba(99,102,241,0.8)]" />
-                </div>
-              </div>
-
-              <div>
-                <div className="flex justify-between text-sm font-medium text-white mb-3">
-                  <span>Risk Calibration</span>
-                  <span className="text-muted-foreground">Pending</span>
-                </div>
-                <div className="h-2 overflow-hidden rounded-full bg-white/10">
-                  <div className="h-full w-[10%] rounded-full bg-white/20" />
-                </div>
-              </div>
-
-            </div>
-
-            <div className="mt-10 rounded-xl border border-white/5 bg-white/5 p-4 flex justify-between items-center">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">System Health</p>
-                <p className="text-lg font-bold text-white">All systems operational</p>
-              </div>
-              <div className="h-3 w-3 rounded-full bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.8)] animate-pulse" />
+              ))}
             </div>
           </div>
         </div>

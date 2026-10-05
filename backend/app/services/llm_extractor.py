@@ -64,8 +64,18 @@ Then extract the following fields and return ONLY a valid JSON object. No explan
       "type": "Sale Deed | Mutation | Gift | Inheritance | other",
       "survey": "survey number"
     }
+  ],
+  "red_flags": [
+    {
+      "type": "dispute | litigation | encumbrance | unregistered_transfer | name_mismatch | missing_link | other",
+      "description": "one to two sentences, grounded in the document's actual text",
+      "severity": "high | medium | low",
+      "source_text": "the specific phrase or clause that triggered this flag, verbatim if possible"
+    }
   ]
 }
+
+When reading this document, also watch for anything that would concern a property lawyer verifying title: language suggesting an ongoing dispute or litigation, any encumbrance (mortgage, lien, charge) mentioned anywhere in the text, a transfer described but not evidenced by registration or mutation, an owner name that doesn't match how it appears elsewhere in this document, or any reference to a prior transaction not otherwise documented here. Report each as an entry in red_flags. Only flag what the text actually supports — do not infer a dispute that isn't stated. If nothing of concern is present, return an empty red_flags array.
 
 Rules:
 - Return ONLY the JSON object, nothing else
@@ -75,6 +85,7 @@ Rules:
 - Never guess a name, date, or number you are not confident about — mark confidence low instead of inventing a plausible-looking value
 - has_handwritten_content: true if ANY part of the document contains handwritten text, even a printed form with handwritten fields filled in. false only if the entire document is printed, typed, or typewritten. Be conservative — if in doubt, mark it true
 - chain array should contain all ownership transfers visible in the document in chronological order
+- red_flags array should be empty, not omitted, when nothing of concern is found — never invent a flag to fill it
 - If only a year is known for a date (no specific day/month), use YYYY-01-01 and note this in unreadable_sections, rather than inventing 00 for missing parts
 - full_text must be the actual transcription, not a summary or paraphrase"""
 
@@ -118,8 +129,18 @@ Extract the following fields from the transcription and return ONLY a valid JSON
       "type": "Sale Deed | Mutation | Gift | Inheritance | other",
       "survey": "survey number"
     }
+  ],
+  "red_flags": [
+    {
+      "type": "dispute | litigation | encumbrance | unregistered_transfer | name_mismatch | missing_link | other",
+      "description": "one to two sentences, grounded in the text's actual content",
+      "severity": "high | medium | low",
+      "source_text": "the specific phrase or clause that triggered this flag, verbatim if possible"
+    }
   ]
 }
+
+When reading this transcription, also watch for anything that would concern a property lawyer verifying title: language suggesting an ongoing dispute or litigation, any encumbrance (mortgage, lien, charge) mentioned anywhere in the text, a transfer described but not evidenced by registration or mutation, an owner name that doesn't match how it appears elsewhere in this text, or any reference to a prior transaction not otherwise documented here. Report each as an entry in red_flags. Only flag what the text actually supports — do not infer a dispute that isn't stated. If nothing of concern is present, return an empty red_flags array.
 
 Rules:
 - Return ONLY the JSON object, nothing else
@@ -127,6 +148,7 @@ Rules:
 - If a field is not present or not stated in the text, use null and mark its confidence as low
 - Never guess a name, date, or number you are not confident about — mark confidence low instead of inventing a plausible-looking value
 - chain array should contain all ownership transfers visible in the text, in chronological order
+- red_flags array should be empty, not omitted, when nothing of concern is found — never invent a flag to fill it
 - If only a year is known for a date (no specific day/month), use YYYY-01-01 and note this in unreadable_sections, rather than inventing 00 for missing parts"""
 
 

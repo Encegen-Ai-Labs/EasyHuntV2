@@ -34,6 +34,67 @@ MAX_CONCURRENT_EXTRACTIONS = 3
 # starts tripping Gemini rate limits.
 MAX_CONCURRENT_PAGES_PER_DOCUMENT = 4
 
+# Maps llm_extractor.py's red_flags[].type taxonomy to a human-readable
+# flag_type label, matching the style of the existing structural flag_type
+# strings ("Survey Number Conflict" etc.) so llm- and structural-sourced
+# flags read consistently side by side in the (currently unwired, see
+# docs/ROADMAP.md Phase 2) flags UI.
+RED_FLAG_TYPE_LABELS = {
+    "dispute": "Dispute",
+    "litigation": "Litigation",
+    "encumbrance": "Encumbrance",
+    "unregistered_transfer": "Unregistered Transfer",
+    "name_mismatch": "Name Mismatch",
+    "missing_link": "Missing Link",
+    "other": "Other Red Flag",
+}
+
+_VALID_RED_FLAG_SEVERITIES = {"high", "medium", "low"}
+
+
+def _iter_valid_red_flags(raw_red_flags: Any, doc_id: str):
+    """Yields only well-formed entries from the LLM's self-reported
+    red_flags array, normalizing severity/type. This is untrusted model
+    output (unlike the chain array, nothing upstream validates its shape) —
+    a malformed entry (wrong type, missing keys, bad severity) is logged and
+    skipped rather than raising, so one bad flag doesn't lose the rest or
+    fail the whole document."""
+    if raw_red_flags is None:
+        return
+    if not isinstance(raw_red_flags, list):
+        logger.error(
+            "pipeline.red_flags_malformed | document_id=%s type=%s",
+            doc_id, type(raw_red_flags).__name__,
+        )
+        return
+    for entry in raw_red_flags:
+        if not isinstance(entry, dict) or not entry.get("description"):
+            logger.error("pipeline.red_flag_entry_malformed | document_id=%s entry=%s", doc_id, entry)
+            continue
+        severity = entry.get("severity")
+        if severity not in _VALID_RED_FLAG_SEVERITIES:
+            # Fail toward more scrutiny, not less — same philosophy as
+            # has_handwritten_content's fail-safe True default (see
+            # validation.py). A malformed/missing severity from the model
+            # gets surfaced as high rather than quietly buried at a lower
+            # priority; a lawyer glancing at one extra high-severity flag
+            # costs far less than a genuinely serious one going unnoticed.
+            severity = "high"
+        yield {
+            "type": entry.get("type") or "other",
+            "description": entry["description"],
+            "severity": severity,
+            "source_text": entry.get("source_text"),
+        }
+
+
+def _format_red_flag_description(red_flag: Dict[str, Any]) -> str:
+    description = red_flag["description"]
+    source_text = red_flag.get("source_text")
+    if source_text:
+        return f'{description} (source text: "{source_text}")'
+    return description
+
 
 class PipelineService:
     def __init__(
@@ -311,7 +372,31 @@ class PipelineService:
             "has_handwritten_content": any_handwriting
         }
 
-        self.generic_repo.insert("extractions", extraction_payload)
+        try:
+            self.generic_repo.insert("extractions", extraction_payload)
+        except Exception as e:
+            # Unlike the document_pages/ownership_chain/flag inserts below
+            # (all secondary — the pipeline is still useful without them),
+            # the extractions row IS the primary record this method exists
+            # to produce; ReviewPage.tsx reads from it directly. Continuing
+            # on to chain/flag steps after this fails would leave the
+            # document's status looking done with nothing backing it, so
+            # fail visibly instead, same as a failed structured-extraction
+            # call above. This also matters because POST
+            # /documents/{id}/process runs this as a FastAPI BackgroundTask
+            # (see documents.py) — an uncaught exception there doesn't
+            # surface as an HTTP error at all, it just leaves the document
+            # silently stuck in "processing" forever with no visible error
+            # anywhere (the same failure mode execute_batch's own wrapper
+            # exists to prevent for the batch-upload path).
+            logger.error("pipeline.extraction_insert_failed | document_id=%s error=%s", doc_id, e)
+            self.doc_repo.update_status(doc_id, "flagged")
+            return {
+                "status": "failed",
+                "case_id": case_id,
+                "document_id": doc_id,
+                "error": str(e)
+            }
 
         # Route based on validation instead of always going to under_review
         if validation_result["needs_human_review"]:
@@ -350,13 +435,16 @@ class PipelineService:
         except Exception as e:
             logger.error("pipeline.document_pages_insert_failed | document_id=%s error=%s", doc_id, e)
 
-        # Step 3: Populate Ownership Chain Records — isolated the same way as
-        # the document_pages insert above: a schema/DB problem here shouldn't
-        # also prevent flag analysis or case finalization below, neither of
-        # which strictly depends on this insert having succeeded.
+        # Step 3: Populate Ownership Chain Records — isolated per record, not
+        # as one try/except around the whole loop: a schema/DB problem on
+        # one chain link shouldn't also prevent flag analysis or case
+        # finalization below (neither depends on this insert having
+        # succeeded), but it also shouldn't silently drop every chain
+        # record after the failing one — each record is independent, so one
+        # failing insert should only cost that one record.
         chain = extracted.get("chain", [])
-        try:
-            for record in chain:
+        for record in chain:
+            try:
                 self.generic_repo.insert("ownership_chain", {
                     "case_id": case_id,
                     "sequence_order": record.get("order"),
@@ -376,8 +464,11 @@ class PipelineService:
                     # value here, not just a workaround.
                     "document_id": None,
                 })
-        except Exception as e:
-            logger.error("pipeline.ownership_chain_insert_failed | document_id=%s error=%s", doc_id, e)
+            except Exception as e:
+                logger.error(
+                    "pipeline.ownership_chain_insert_failed | document_id=%s sequence_order=%s error=%s",
+                    doc_id, record.get("order"), e,
+                )
 
         # Step 4: Run Flag Analyzer Engine
         base_survey = extracted.get("survey_number")
@@ -389,10 +480,35 @@ class PipelineService:
                         "flag_type": "Survey Number Mismatch",
                         "severity": "high",
                         "description": f"Chain link {record.get('order')} has survey {record.get('survey')} instead of {base_survey}",
-                        "status": "raised"
+                        "status": "raised",
+                        "source": "structural"
                     })
                 except Exception as e:
                     logger.error("pipeline.flag_create_failed | document_id=%s error=%s", doc_id, e)
+
+        # Step 4b: Persist red flags the extraction LLM found in the
+        # document's own text (disputes, litigation, encumbrances, etc. —
+        # see llm_extractor.py's red_flags schema/taxonomy). Distinct from
+        # the structural checks above, which only reason over the already-
+        # extracted chain array; these come from the model reading prose it
+        # was never explicitly asked to cross-reference against other
+        # documents, so each entry is validated defensively rather than
+        # trusted as well-formed. document_id is set (unlike ownership_chain
+        # inserts above) since a red flag genuinely originates from one
+        # specific document's text, not a case-level fact.
+        for red_flag in _iter_valid_red_flags(extracted.get("red_flags"), doc_id):
+            try:
+                self.flag_repo.create_flag({
+                    "case_id": case_id,
+                    "document_id": doc_id,
+                    "flag_type": RED_FLAG_TYPE_LABELS.get(red_flag["type"], "Other Red Flag"),
+                    "severity": red_flag["severity"],
+                    "description": _format_red_flag_description(red_flag),
+                    "status": "raised",
+                    "source": "llm"
+                })
+            except Exception as e:
+                logger.error("pipeline.llm_red_flag_create_failed | document_id=%s error=%s", doc_id, e)
 
         # Finalize
         self.case_repo.update_case(case_id, {"status": "review"})

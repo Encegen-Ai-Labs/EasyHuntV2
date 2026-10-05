@@ -235,3 +235,48 @@ class TestRiskFlagging:
         risk_svc, _ = self._setup(records)
         flags = risk_svc.run_case_level_checks(CASE_ID)
         assert all(f["status"] == "raised" for f in flags)
+
+    def test_one_flag_insert_failure_does_not_lose_others_or_crash(self, caplog):
+        # Regression guard: before each create_flag call was individually
+        # wrapped, one failing insert (e.g. finalize_case() called before
+        # migration 0006 added risk_flags.source) would raise straight out
+        # of run_case_level_checks() uncaught, both losing the other flags
+        # this run would have created and crashing finalize_case() itself.
+        class FlakyFlagRepo:
+            def __init__(self):
+                self.flags = []
+
+            def create_flag(self, payload):
+                if payload["flag_type"] == "Survey Number Conflict":
+                    raise Exception("could not find the 'source' column of 'risk_flags'")
+                self.flags.append(payload)
+                return payload
+
+        records = [
+            make_record(1, "Ramesh Patil", "1990-03-15", "Sale Deed", survey="SY-123/A"),
+            make_record(2, "Suresh Kumar", "2001-07-22", None,         survey="SY-456/B"),
+        ]
+        chain_svc = ChainReconstructionService(FakeGenericRepo(records))
+        flag_repo = FlakyFlagRepo()
+        risk_svc = RiskFlaggingService(flag_repo, chain_svc)
+
+        with caplog.at_level("ERROR"):
+            flags = risk_svc.run_case_level_checks(CASE_ID)
+
+        flag_types = [f["flag_type"] for f in flags]
+        assert "Survey Number Conflict" not in flag_types
+        assert "Ownership Chain Gap" in flag_types
+        assert any("risk_service.flag_create_failed" in r.message for r in caplog.records)
+
+    def test_flags_are_tagged_structural_source(self):
+        # Distinguishes these chain-derived flags from the LLM-derived ones
+        # persisted in pipeline_service.py (see docs/DECISIONS.md D3) — both
+        # land in the same risk_flags table/API, tagged by provenance.
+        records = [
+            make_record(1, "Ramesh Patil", "1990-03-15", "Sale Deed", survey="SY-123/A"),
+            make_record(2, "Suresh Kumar", "2001-07-22", None,         survey="SY-456/B"),
+        ]
+        risk_svc, _ = self._setup(records)
+        flags = risk_svc.run_case_level_checks(CASE_ID)
+        assert len(flags) > 0
+        assert all(f["source"] == "structural" for f in flags)

@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { BatchUploadPanel } from "@/components/upload/BatchUploadPanel";
 import { DocumentList } from "@/components/case/DocumentList";
+import { RiskFlagsPanel } from "@/components/case/RiskFlagsPanel";
 import { CaseSearchPanel } from "@/components/search/CaseSearchPanel";
 
 export function CaseWorkspacePage() {
@@ -99,6 +100,11 @@ export function CaseWorkspacePage() {
             <DocumentList caseId={caseId} refreshKey={documentListKey} />
           </CardContent>
         </Card>
+
+        {/* Risk flags */}
+        <div className="mt-6">
+          <RiskFlagsPanel caseId={caseId} />
+        </div>
 
         {/* Search */}
         <Card className="mt-6">

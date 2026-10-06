@@ -49,7 +49,7 @@ export function LoginPage() {
               <FileCheck2 size={20} />
             </span>
             <div>
-              <div className="text-[10px] font-bold uppercase tracking-widest opacity-60">PropVerify AI</div>
+              <div className="text-[10px] font-bold uppercase tracking-widest opacity-60">EasyHuntV2</div>
               <div className="text-lg font-semibold leading-none">Risk Intelligence</div>
             </div>
           </div>
@@ -85,10 +85,10 @@ export function LoginPage() {
             </div>
           </div>
 
-          <div className="relative z-10 flex items-center gap-8 text-sm opacity-60">
-            <span className="font-medium">24k+ records</span>
-            <span className="font-medium">99.9% uptime</span>
-            <span className="font-medium">SOC 2 ready</span>
+          <div className="relative z-10 flex flex-wrap items-center gap-x-8 gap-y-2 text-sm opacity-70">
+            <span className="font-medium">Document processing</span>
+            <span className="font-medium">Source-linked review</span>
+            <span className="font-medium">Reviewer-controlled reports</span>
           </div>
         </section>
 
@@ -98,7 +98,7 @@ export function LoginPage() {
             <div className="mb-6">
               <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Welcome back</p>
               <h2 className="mt-2 text-2xl font-bold tracking-tight">Sign in</h2>
-              <p className="mt-1 text-sm text-muted-foreground">Access the PropVerify intelligence workspace</p>
+              <p className="mt-1 text-sm text-muted-foreground">Sign in to your property review workspace</p>
             </div>
 
             <Card>
@@ -108,7 +108,7 @@ export function LoginPage() {
                     <label htmlFor="login-email" className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
                       Work email
                     </label>
-                    <Input id="login-email" type="email" placeholder="alex@propverify.ai" {...register("email")} aria-invalid={!!errors.email} />
+                    <Input id="login-email" type="email" placeholder="alex@example.com" {...register("email")} aria-invalid={!!errors.email} />
                     {errors.email && <p className="text-xs text-destructive">{String(errors.email.message)}</p>}
                   </div>
 

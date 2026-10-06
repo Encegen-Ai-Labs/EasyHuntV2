@@ -169,11 +169,7 @@ class ReportBuilderService:
         )
         self.report_repo.update_file_path(result["id"], storage_path)
 
-        signed_url = self.report_repo.client.storage.from_(REPORTS_BUCKET).create_signed_url(
-            storage_path, 3600
-        )["signedURL"]
-
-        return {"file_path": storage_path, "download_url": signed_url}
+        return {"file_path": storage_path, "pdf_bytes": pdf_bytes}
 
     def _get_owned_excerpt(self, report_id: str, excerpt_id: str) -> Dict[str, Any]:
         excerpt = self.excerpt_repo.get_by_id(excerpt_id)

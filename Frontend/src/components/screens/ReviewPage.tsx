@@ -15,9 +15,11 @@ import {
 import type { DocumentRecord, ExtractionRecord } from "@/services/api/client";
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/context/ToastContext";
+import { apiClient } from "@/services/api/client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { SelectableText } from "@/components/search/SelectableText";
 
 // Keys the extraction prompt (backend/app/services/llm_extractor.py) returns
 // alongside every field, e.g. "owner_name_confidence" — paired up with their
@@ -98,6 +100,7 @@ export function ReviewPage() {
   const [editedEnglishText, setEditedEnglishText] = useState("");
   const [initialOriginalText, setInitialOriginalText] = useState("");
   const [initialEnglishText, setInitialEnglishText] = useState("");
+  const [isAddingExcerpt, setIsAddingExcerpt] = useState(false);
 
   const active = entries.find((e) => e.document.id === activeDocId) ?? entries[0] ?? null;
 
@@ -179,6 +182,27 @@ export function ReviewPage() {
       toast.success("Document translated to English.", "Translation Complete");
     } else {
       toast.error(result.error || "Failed to translate document", "Error");
+    }
+  }
+
+  async function handleAddPageExcerpt(pageNumber: number, excerptText: string | null) {
+    if (!excerptText || !active) {
+      toast.warning("Select text from a page first.", "Nothing Selected");
+      return;
+    }
+
+    setIsAddingExcerpt(true);
+    const result = await apiClient.reportBuilder.addExcerpt(caseId, {
+      document_id: active.document.id,
+      page_number: pageNumber,
+      excerpt_text: excerptText,
+    });
+    setIsAddingExcerpt(false);
+
+    if (result.success) {
+      toast.success("Selected text added to the report workspace.", "Excerpt Added");
+    } else {
+      toast.error(result.error || "Failed to add selected text", "Error");
     }
   }
 
@@ -573,7 +597,17 @@ export function ReviewPage() {
                             className="min-h-[120px] w-full rounded-lg border border-input bg-transparent px-2.5 py-1.5 text-sm outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30"
                           />
                         ) : (
-                          <p className="whitespace-pre-wrap text-sm">{page.original_text || "—"}</p>
+                          page.original_text ? (
+                            <SelectableText
+                              text={page.original_text}
+                              query=""
+                              disabled={isAddingExcerpt}
+                              addLabel="Add selected text to report"
+                              onAddSelection={(text) => void handleAddPageExcerpt(page.page_number, text)}
+                            />
+                          ) : (
+                            <p className="text-sm text-muted-foreground">—</p>
+                          )
                         )}
                       </div>
                       <div className="border-t border-border pt-3 md:border-t-0 md:border-l md:pt-0 md:pl-3">
@@ -586,7 +620,13 @@ export function ReviewPage() {
                             className="min-h-[120px] w-full rounded-lg border border-input bg-transparent px-2.5 py-1.5 text-sm outline-none transition-colors placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30"
                           />
                         ) : page.english_text ? (
-                          <p className="whitespace-pre-wrap text-sm">{page.english_text}</p>
+                          <SelectableText
+                            text={page.english_text}
+                            query=""
+                            disabled={isAddingExcerpt}
+                            addLabel="Add selected text to report"
+                            onAddSelection={(text) => void handleAddPageExcerpt(page.page_number, text)}
+                          />
                         ) : (
                           <p className="text-sm text-muted-foreground">Not translated yet.</p>
                         )}

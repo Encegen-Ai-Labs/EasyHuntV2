@@ -115,8 +115,15 @@ export function ReportBuilderPage() {
     setIsExporting(false);
 
     if (result.success && result.data) {
-      window.open(result.data.download_url, "_blank", "noopener,noreferrer");
-      toast.success("Report exported. Download should start in a new tab.", "Export Complete");
+      const url = URL.createObjectURL(result.data);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "report.pdf";
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+      toast.success("Report downloaded.", "Export Complete");
     } else {
       toast.error(result.error || "Failed to export report", "Export Error");
     }

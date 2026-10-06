@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowRight, FileCode, MapPin, Search as SearchIcon, UploadCloud } from "lucide-react";
+import { ArrowRight, MapPin, Search as SearchIcon, UploadCloud } from "lucide-react";
 import { apiClient, type CaseRecord } from "@/services/api/client";
 import { useToast } from "@/context/ToastContext";
 import { Button } from "@/components/ui/button";
@@ -16,7 +16,7 @@ import { CaseSearchPanel } from "@/components/search/CaseSearchPanel";
 export function CaseWorkspacePage() {
   const params = useParams();
   const router = useRouter();
-  const caseId = (params?.id as string) || "PV-2408";
+  const caseId = (params?.id as string) || "";
   const toast = useToast();
 
   const [caseDetails, setCaseDetails] = useState<CaseRecord | null>(null);
@@ -52,8 +52,7 @@ export function CaseWorkspacePage() {
               {caseDetails?.title || caseDetails?.property_name || "Case Workspace"}
             </h1>
             <p className="mt-1 text-xs text-muted-foreground flex items-center gap-3">
-              <span className="flex items-center gap-1"><MapPin size={13} /> {caseDetails?.address || caseDetails?.location || "Miami, FL"}</span>
-              <span className="flex items-center gap-1"><FileCode size={13} /> Survey No: {caseDetails?.survey_number || "SV-9912"}</span>
+              <span className="flex items-center gap-1"><MapPin size={13} /> {caseDetails?.address || caseDetails?.location || "Location not set"}</span>
             </p>
           </div>
 
@@ -114,7 +113,7 @@ export function CaseWorkspacePage() {
               Search Case Documents
             </CardTitle>
             <CardDescription>
-              Exact keyword search across every document&apos;s original-language and English text.
+              Search exact words or find semantically related passages in the case documents.
             </CardDescription>
           </CardHeader>
           <CardContent className="pt-6">

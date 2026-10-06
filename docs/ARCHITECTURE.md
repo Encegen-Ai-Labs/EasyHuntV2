@@ -1,6 +1,6 @@
 # EasyHuntV2 — Architecture (SOP steps 1–8)
 
-This describes the system **as it exists today**, confirmed by [AUDIT.md](./AUDIT.md), plus the specific deltas planned in [ROADMAP.md](./ROADMAP.md). It is not a greenfield design — almost all of this is already built and working.
+This describes the system **as it exists today**, confirmed by [AUDIT.md](./AUDIT.md), and records the relevant completed changes in [ROADMAP.md](./ROADMAP.md). It is not a greenfield design.
 
 ## Components
 
@@ -8,6 +8,7 @@ This describes the system **as it exists today**, confirmed by [AUDIT.md](./AUDI
 - **Backend** — FastAPI app (`backend/app`), no ORM — thin repository classes over `supabase-py`'s `.table()`/`.rpc()` client (`app/repositories/*.py`).
 - **Supabase** — Postgres (schema defined in the hosted dashboard, not in-repo — see AUDIT.md) + Storage bucket `documents` for original and enhanced page images + pgvector extension for search embeddings.
 - **OCR** — Tesseract, local, `eng+hin+mar+tam+tel+kan` (`app/ocr/tesseract_provider.py`).
+- **Document queue** — Celery workers with Redis as broker. Docker Compose enables this; ordinary local API development keeps the existing FastAPI background-task path unless `CELERY_ENABLED=true`.
 - **VLM/LLM** — Google Gemini (`google.genai`), used for (a) low-confidence/handwritten page transcription, (b) structured field extraction from transcribed text, (c) search-query/page embeddings (`gemini-embedding-001`).
 - **Translation** — Google Cloud Translation v2, a separate API key from Gemini's, so translation cost is decoupled from the paid extraction model.
 
@@ -17,8 +18,10 @@ This describes the system **as it exists today**, confirmed by [AUDIT.md](./AUDI
 flowchart TD
     A[Lawyer creates case] --> B[Batch upload up to 20 files]
     B --> C[Storage: cases/case_id/file_name]
-    B --> D[Background pipeline per document]
-    D --> E[Rasterize to per-page PNGs<br/>PyMuPDF, 200 DPI]
+    B --> D[Enqueue one task per document]
+    D --> BROKER[(Redis)]
+    BROKER --> W[Celery workers<br/>configurable concurrency]
+    W --> E[Rasterize to per-page PNGs<br/>PyMuPDF, 200 DPI]
     E --> F[Image enhancement<br/>quality-gated deskew / denoise / CLAHE / sharpen]
     F --> G{Route per page}
     G -->|typed/printed, high OCR confidence| H[Tesseract OCR]
@@ -32,13 +35,27 @@ flowchart TD
     N --> O[Structural risk checks<br/>chain_service + risk_service]
     O --> P[risk_flags rows<br/>survey conflicts, chain gaps]
     L --> Q[Embedding per page<br/>gemini-embedding-001]
-    Q --> R[document_pages.embedding]
+    Q --> EMBEDDING[document_pages.embedding]
     N --> S[Lawyer review UI<br/>edit fields/pages, approve/flag]
-    R --> T[Case search<br/>exact ILIKE + semantic pgvector]
+    EMBEDDING --> T[Case search<br/>exact ILIKE + semantic pgvector]
     T --> U[Search results: doc + page,<br/>highlighted, editable]
 ```
 
-## Planned delta (Phase 1–2, see ROADMAP.md)
+### Parallel document processing
+
+The upload endpoint stores every accepted file and document row first, then publishes one `documents.process` Celery task per document. Redis holds the queue; workers load the document from Supabase and run the existing pipeline. The browser reads status from the `documents` table, so no task-result polling or in-process API memory is required. Tasks use late acknowledgement, retry unexpected worker failures twice, and mark a document `flagged` after the final failure. Expected pipeline failures also set `flagged`.
+
+To run the API, Redis, and workers with Docker:
+
+1. Copy `backend/.env.example` to `backend/.env`, then fill in `SUPABASE_URL`, `SUPABASE_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_JWT_SECRET`, and any model API keys. Docker Compose loads this file into both the API and worker containers. Do not use the sample values in production.
+2. Run `docker compose up --build`.
+3. The default worker runs three documents concurrently. Increase capacity with `docker compose up --build --scale worker=2`; this runs two workers at three tasks each. Page work is also concurrent (up to four pages per document), so the highest theoretical VLM parallelism is worker count × worker concurrency × four. Adjust `CELERY_WORKER_CONCURRENCY` if provider limits require a lower ceiling.
+
+On local development without Redis, leave `CELERY_ENABLED=false` and the API retains its prior in-process background processing. Enable it only when a reachable broker and at least one Celery worker are running.
+
+Image enhancement always produces and stores a page artifact when processing succeeds. A clean page can pass through with no pixel-changing enhancement steps; a missing enhanced image therefore indicates that processing is still running or that storing the artifact failed, not that the quality gate skipped saving it. The worker logs identify the document/page for enhancement fallback and storage failures.
+
+## Risk-flag extraction and review
 
 ```mermaid
 flowchart LR
@@ -48,7 +65,7 @@ flowchart LR
     P2 --> UI
 ```
 
-Nothing about the pipeline's shape changes — the delta is a new field on the existing extraction JSON contract, persisted into the existing `risk_flags` table (now carrying a `source` tag), surfaced through the existing `flags` API into a UI screen that doesn't exist yet.
+The extraction JSON includes grounded legal red flags, persisted into the existing `risk_flags` table with a `source` tag and surfaced through the existing `flags` API and review UI.
 
 ## Roles and ownership (already final)
 

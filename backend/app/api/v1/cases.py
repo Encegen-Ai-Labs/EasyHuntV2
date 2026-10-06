@@ -28,7 +28,9 @@ def create_case(
     return service.create(
         creator_id=str(current_user["id"]),
         property_name=payload.property_name,
-        survey_number=payload.survey_number,
+        # Keep the existing non-null case column compatible while allowing
+        # survey numbers to come from uploaded documents instead of intake.
+        survey_number=payload.survey_number or "",
         location=payload.location
     )
 

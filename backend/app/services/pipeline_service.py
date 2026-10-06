@@ -134,8 +134,8 @@ class PipelineService:
         if enhance_report.get("fallback"):
             logger.info(
                 "pipeline.page_enhance_fallback | document_id=%s page=%s "
-                "reason=could_not_decode_or_process_image, used original bytes",
-                doc_id, page_number,
+                "reason=could_not_decode_or_process_image, used original bytes error=%s",
+                doc_id, page_number, enhance_report.get("error"),
             )
         else:
             applied = [

@@ -12,7 +12,7 @@ class CaseStatusEnum(str, Enum):
 
 class CaseCreate(BaseModel):
     property_name: str
-    survey_number: str
+    survey_number: Optional[str] = None
     location: Optional[str] = None  # Accepted in POST request payload
 
 class CaseUpdate(BaseModel):

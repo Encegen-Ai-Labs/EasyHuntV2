@@ -119,11 +119,6 @@ export interface ReportBuilderState {
   excerpts: ReportExcerpt[];
 }
 
-export interface ReportExportResult {
-  file_path: string;
-  download_url: string;
-}
-
 // Shape of app/services/pipeline_service.py's "extractions" table rows — the
 // real Gemini extraction output. validated_json_output holds the actual fields
 // (backend/app/services/llm_extractor.py's EXTRACTION_PROMPT: owner_name,
@@ -226,7 +221,7 @@ export const apiClient = {
       return { data: normalizeCase(item) };
     },
 
-    create: async (payload: { property_name: string; survey_number: string; location?: string }) => {
+    create: async (payload: { property_name: string; location?: string }) => {
       try {
         const res = await fetch(`${API_BASE_URL}/cases`, {
           method: "POST",
@@ -756,7 +751,7 @@ export const apiClient = {
       }
     },
 
-    exportPdf: async (caseId: string): Promise<{ success: boolean; data?: ReportExportResult; error?: string }> => {
+    exportPdf: async (caseId: string): Promise<{ success: boolean; data?: Blob; error?: string }> => {
       try {
         const res = await fetch(`${API_BASE_URL}/cases/${caseId}/report-builder/export`, {
           method: "POST",
@@ -766,7 +761,7 @@ export const apiClient = {
           const errData = await res.json().catch(() => ({}));
           throw new Error(errData.detail || `Export failed with status ${res.status}`);
         }
-        return { success: true, data: await res.json() };
+        return { success: true, data: await res.blob() };
       } catch (err: any) {
         return { success: false, error: err.message };
       }

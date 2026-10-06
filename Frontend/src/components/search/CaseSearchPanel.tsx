@@ -27,6 +27,9 @@ export function CaseSearchPanel({ caseId, onExcerptAdded }: CaseSearchPanelProps
   const toast = useToast();
   const [query, setQuery] = useState("");
   const [submittedQuery, setSubmittedQuery] = useState("");
+  const [mode, setMode] = useState<"exact" | "semantic">("exact");
+  const [submittedMode, setSubmittedMode] = useState<"exact" | "semantic">("exact");
+  const [searchError, setSearchError] = useState<string | null>(null);
   const [isSearching, setIsSearching] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
   const [results, setResults] = useState<SearchResult[]>([]);
@@ -40,18 +43,26 @@ export function CaseSearchPanel({ caseId, onExcerptAdded }: CaseSearchPanelProps
     setIsSearching(true);
     setHasSearched(true);
     setSubmittedQuery(trimmed);
+    setSubmittedMode(mode);
+    setSearchError(null);
     setExpanded({});
 
-    // Search mode is hardcoded to "exact" — semantic search exists and is
-    // fully wired on the backend (search_service.py's mode="semantic" path,
-    // document_pages.embedding, the match_document_pages RPC) but is ahead
-    // of the current SOP-8 scope ("exact match first, no fuzzy or semantic
-    // matching yet" — see docs/DECISIONS.md D5). Re-enabling it later is a
-    // one-line change here plus restoring the mode toggle UI below; nothing
-    // on the backend needs to change.
-    const result = await apiClient.search.searchCase(caseId, trimmed, "exact");
-    setResults(result.success && result.data ? result.data.results : []);
+    const result = await apiClient.search.searchCase(caseId, trimmed, mode);
+    if (result.success && result.data) {
+      setResults(result.data.results);
+    } else {
+      setResults([]);
+      setSearchError(result.error || "Search failed.");
+    }
     setIsSearching(false);
+  }
+
+  function selectMode(nextMode: "exact" | "semantic") {
+    setMode(nextMode);
+    setHasSearched(false);
+    setResults([]);
+    setExpanded({});
+    setSearchError(null);
   }
 
   async function toggleExpand(documentId: string, pageNumber: number) {
@@ -107,20 +118,36 @@ export function CaseSearchPanel({ caseId, onExcerptAdded }: CaseSearchPanelProps
 
   return (
     <div className="flex flex-col gap-4">
-      <form onSubmit={handleSearch} className="flex gap-2">
-        <div className="relative flex-1">
-          <Search className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            className="pl-8"
-            placeholder="Search across this case's documents…"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-          />
+      <form onSubmit={handleSearch} className="flex flex-col gap-2 sm:flex-row">
+        <div className="flex flex-1 gap-2">
+          <div className="relative flex-1">
+            <Search className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              className="pl-8"
+              placeholder="Search across this case's documents…"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+            />
+          </div>
+          <Button type="submit" disabled={isSearching || !query.trim()}>
+            {isSearching ? <Loader2 size={16} className="animate-spin" /> : "Search"}
+          </Button>
         </div>
-        <Button type="submit" disabled={isSearching || !query.trim()}>
-          {isSearching ? <Loader2 size={16} className="animate-spin" /> : "Search"}
-        </Button>
+        <div className="flex gap-1 self-start rounded-lg border border-border p-1">
+          <Button type="button" size="sm" variant={mode === "exact" ? "secondary" : "ghost"} onClick={() => selectMode("exact")}>
+            Exact
+          </Button>
+          <Button type="button" size="sm" variant={mode === "semantic" ? "secondary" : "ghost"} onClick={() => selectMode("semantic")}>
+            <Sparkles size={13} data-icon="inline-start" />
+            Similar
+          </Button>
+        </div>
       </form>
+      {mode === "semantic" && (
+        <p className="text-xs text-muted-foreground">
+          Similar search highlights matching query words, or shades the relevant passage when no query words appear verbatim.
+        </p>
+      )}
 
       {isSearching && (
         <div className="flex items-center justify-center gap-2 py-8 text-xs text-muted-foreground">
@@ -129,9 +156,13 @@ export function CaseSearchPanel({ caseId, onExcerptAdded }: CaseSearchPanelProps
         </div>
       )}
 
-      {!isSearching && hasSearched && results.length === 0 && (
+      {!isSearching && searchError && (
+        <p className="rounded-md bg-destructive/10 px-3 py-2 text-xs text-destructive">{searchError}</p>
+      )}
+
+      {!isSearching && !searchError && hasSearched && results.length === 0 && (
         <p className="py-6 text-center text-xs text-muted-foreground">
-          No matches for &ldquo;{submittedQuery}&rdquo;.
+          No {submittedMode === "semantic" ? "similar passages" : "matches"} for &ldquo;{submittedQuery}&rdquo;.
         </p>
       )}
 
@@ -176,7 +207,11 @@ export function CaseSearchPanel({ caseId, onExcerptAdded }: CaseSearchPanelProps
                       </button>
 
                       <p className="mt-1.5 leading-relaxed text-foreground/90">
-                        <HighlightedText text={r.snippet} query={submittedQuery} />
+                        <HighlightedText
+                          text={r.snippet}
+                          query={submittedQuery}
+                          highlightFallback={r.matched_in === "semantic"}
+                        />
                       </p>
 
                       {expandedState && (

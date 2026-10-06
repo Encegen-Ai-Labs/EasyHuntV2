@@ -37,10 +37,6 @@ class FakeStorageBucket:
         self.uploaded.append((path, file))
         return {"path": path}
 
-    def create_signed_url(self, path, expires_in):
-        return {"signedURL": f"https://example.com/{path}?signed=true"}
-
-
 class FakeStorage:
     def __init__(self):
         self.bucket = FakeStorageBucket()
@@ -247,7 +243,7 @@ def test_unrelated_reviewer_is_blocked_from_the_case_report():
         service.get_or_create_report(CASE_ID, REVIEWER)
 
 
-def test_export_pdf_uploads_updates_file_path_and_returns_signed_url():
+def test_export_pdf_uploads_and_returns_pdf_bytes_without_a_signed_url():
     report_repo = FakeReportRepo()
     service = make_service(report_repo=report_repo)
     service.add_excerpt(CASE_ID, DOC_ID, 1, "the excerpt text", None, REVIEWER)
@@ -255,12 +251,12 @@ def test_export_pdf_uploads_updates_file_path_and_returns_signed_url():
     result = service.export_pdf(CASE_ID, REVIEWER)
 
     assert result["file_path"] == f"reports/{CASE_ID}/manual/report.pdf"
-    assert result["download_url"] == f"https://example.com/reports/{CASE_ID}/manual/report.pdf?signed=true"
+    assert result["pdf_bytes"].startswith(b"%PDF")
 
     # Uploaded bytes are a real PDF, not a placeholder.
     uploaded_path, uploaded_bytes = report_repo.client.storage.bucket.uploaded[-1]
     assert uploaded_path == result["file_path"]
-    assert uploaded_bytes.startswith(b"%PDF")
+    assert uploaded_bytes == result["pdf_bytes"]
 
     # The report row was updated with the same path.
     report = report_repo.get_by_case_and_type(CASE_ID, "manual")

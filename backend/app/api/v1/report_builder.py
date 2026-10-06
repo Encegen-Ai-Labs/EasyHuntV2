@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Response, status
 from typing import Any, Dict, List
 from app.schemas.report_builder import (
     ExcerptCreate,
@@ -6,7 +6,6 @@ from app.schemas.report_builder import (
     ExcerptResponse,
     ExcerptUpdate,
     ReportBuilderResponse,
-    ReportExportResponse,
 )
 from app.services.report_builder_service import ReportBuilderService
 from app.services.doc_service import DocumentService
@@ -86,13 +85,20 @@ def reorder_excerpts(
 ):
     return service.reorder_excerpts(case_id, [str(i) for i in payload.excerpt_ids], current_user)
 
-@router.post("/{case_id}/report-builder/export", response_model=ReportExportResponse)
+@router.post("/{case_id}/report-builder/export")
 def export_report(
     case_id: str,
     current_user: Dict[str, Any] = Depends(RoleRequirement(["Reviewer", "Admin"])),
     service: ReportBuilderService = Depends(get_report_builder_service),
 ):
-    """Renders the current excerpts into a PDF, uploads it, and returns a signed
-    download URL — safe to call repeatedly as the report is edited, each call
-    overwrites the same storage path."""
-    return service.export_pdf(case_id, current_user)
+    """Renders and stores the report, then streams the PDF through this authorized API."""
+    result = service.export_pdf(case_id, current_user)
+    return Response(
+        content=result["pdf_bytes"],
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": 'attachment; filename="report.pdf"',
+            "Cache-Control": "private, no-store",
+            "X-Content-Type-Options": "nosniff",
+        },
+    )

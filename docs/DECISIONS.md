@@ -42,6 +42,8 @@
 
 ## D5 — Semantic search: hide, don't remove
 
+**Superseded by D8 below:** the reviewer subsequently requested access to similar search in the case workspace.
+
 **Decision:** Remove the "Similar meaning" toggle from `CaseSearchPanel.tsx` so only exact search is user-facing, matching the stated SOP-8 scope ("exact match first, no fuzzy or semantic matching yet"). Leave `search_service.py`'s semantic path, `document_pages.embedding`, and the `match_document_pages` RPC untouched and dormant.
 
 **Options considered:**
@@ -70,5 +72,11 @@
 
 - ~~Migration `backend/migrations/0006_risk_flags_source.sql` has not been applied~~ — **confirmed applied to the live Supabase project.**
 - **Phase 1's red-flag extraction (the `red_flags` field added to `EXTRACTION_PROMPT`/`STRUCTURED_EXTRACTION_FROM_TEXT_PROMPT`) has only been verified against fakes in `pytest` — not against a real document through the live Gemini API.** The taxonomy, the lawyer-framing paragraph, and the defensive parsing (`_iter_valid_red_flags`) are all unit-tested, but nobody has confirmed the model actually produces sensible, well-formed `red_flags` entries for a real dispute/encumbrance clause yet. Now that the migration is applied, verify by uploading a real test document (see the Phase 1 hand-verification steps) — **still outstanding**, deferred by the user ("will do it later").
-- **Hand verification of Phases 2–4 is also still outstanding.** All four phases have automated test coverage (164 passing) and clean frontend builds, but nobody has clicked through the actual running app yet — risk-flags rendering with real data (Phase 2), the deleted/fixed dead-code screens (Phase 3), and exact-only search behavior (Phase 4) are all unverified by hand. See each phase's "Manual verification" column in ROADMAP.md.
+- **Hand verification of Phases 2–4 is also still outstanding.** The changes have automated test coverage and clean frontend builds, but nobody has clicked through the actual running app yet — risk-flags rendering with real data (Phase 2), the deleted/fixed dead-code screens (Phase 3), and exact/semantic search highlighting (Phase 4) are unverified by hand. See each phase's "Manual verification" column in ROADMAP.md.
 - ~~Open, not yet decided: unrecognized/malformed `red_flags[].severity` default~~ — **decided**: defaults to `"high"`, not `"medium"` (`pipeline_service.py::_iter_valid_red_flags`). Same fail-toward-more-scrutiny reasoning as `has_handwritten_content`'s fail-safe `True` default — a lawyer glancing at one extra high-severity flag costs less than a genuinely serious one being buried. Also decided: the `red_flags` taxonomy stays three levels (`high`/`medium`/`low`), no `"critical"` tier — `_VALID_RED_FLAG_SEVERITIES` in `pipeline_service.py` already only recognized these three, so no code change was needed there beyond the default. Note this is scoped to LLM red flags only: `app/schemas/flags.py::FlagSeverityEnum` (used by the pre-existing manual flag-raising endpoint, `POST /flags/{case_id}`) still allows `"critical"` — that's a separate, out-of-scope feature, not touched.
+
+## D8 — Re-enable similar search and show its matching passage
+
+**Decision:** Keep exact search as the default and expose the existing semantic mode as an explicit "Similar" option. Highlight individual query terms when present; when the semantically matched snippet contains none of those literal terms, highlight the result passage rather than implying that a specific synonym was identified.
+
+**Reason:** The reviewer requested similar search and reliable highlighting. The embedding/RPC path is already implemented and tested; the UI was the only layer forcing exact mode. A page-level vector match does not identify a particular synonymous word, so the UI distinguishes a semantically relevant passage from literal token matches.

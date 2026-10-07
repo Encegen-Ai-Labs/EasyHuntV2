@@ -103,6 +103,8 @@ export interface SearchResponse {
   query: string;
   mode: SearchMode;
   results: SearchResult[];
+  /** Semantic mode only: the similar-meaning part could not run; results are exact matches only. */
+  similar_unavailable?: boolean;
 }
 
 export interface ReportExcerpt {

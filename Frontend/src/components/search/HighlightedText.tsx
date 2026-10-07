@@ -1,44 +1,39 @@
 import React from "react";
-
-function escapeRegExp(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
+import { highlightSegments } from "@/lib/highlight";
 
 interface HighlightedTextProps {
   text: string;
   query: string;
+  /** Similar-meaning result: when no query word occurs literally, mark the
+   * whole passage instead of implying a specific word matched. */
   highlightFallback?: boolean;
 }
 
-/** Wraps every case-insensitive occurrence of `query` in `text` with <mark>. */
+/** Highlights where `query` occurs in `text`: the whole phrase when present,
+ * otherwise each query word (see lib/highlight.ts, which also handles
+ * Devanagari and other Indic scripts). */
 export function HighlightedText({ text, query, highlightFallback = false }: HighlightedTextProps) {
-  const trimmedQuery = query.trim();
-  if (!trimmedQuery) return <>{text}</>;
+  const { segments, mode } = highlightSegments(text, query, highlightFallback);
 
-  const terms = [...new Set(trimmedQuery.match(/[\p{L}\p{M}\p{N}]+/gu) ?? [trimmedQuery])];
-  if (terms.length === 0) return <>{text}</>;
-  const termSet = new Set(terms.map((term) => term.toLocaleLowerCase()));
-  const matcher = new RegExp(`(${terms.sort((a, b) => b.length - a.length).map(escapeRegExp).join("|")})`, "giu");
-  const parts = text.split(matcher);
-  const hasLiteralMatch = parts.some((part) => termSet.has(part.toLocaleLowerCase()));
+  if (mode === "none") return <>{segments[0]?.text ?? text}</>;
 
-  if (highlightFallback && !hasLiteralMatch) {
+  if (mode === "passage") {
     return (
       <mark className="rounded bg-violet-300/60 px-0.5 text-foreground dark:bg-violet-500/30">
-        {text}
+        {segments[0].text}
       </mark>
     );
   }
 
   return (
     <>
-      {parts.map((part, i) =>
-        termSet.has(part.toLocaleLowerCase()) ? (
+      {segments.map((segment, i) =>
+        segment.match ? (
           <mark key={i} className="rounded bg-yellow-300/70 px-0.5 text-foreground dark:bg-yellow-500/40">
-            {part}
+            {segment.text}
           </mark>
         ) : (
-          <React.Fragment key={i}>{part}</React.Fragment>
+          <React.Fragment key={i}>{segment.text}</React.Fragment>
         )
       )}
     </>

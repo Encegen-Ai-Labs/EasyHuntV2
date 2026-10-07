@@ -113,7 +113,7 @@ export function CaseWorkspacePage() {
               Search Case Documents
             </CardTitle>
             <CardDescription>
-              Exact keyword search across every document&apos;s original-language and English text.
+              Search exact words or find semantically related passages in the case documents.
             </CardDescription>
           </CardHeader>
           <CardContent className="pt-6">

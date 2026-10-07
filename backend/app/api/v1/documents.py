@@ -10,9 +10,11 @@ from app.repositories.document_page_repo import DocumentPageRepository
 from app.services.translation_service import translate_pages
 from app.services.embedding_service import embed_text
 from app.core.logging import logger
+from app.core.config import settings
 from app.dependencies.db import get_supabase_client
 from app.dependencies.auth import RoleRequirement
 from app.core.exceptions import PropertySystemException, ResourceNotFoundError
+from app.tasks.document_tasks import process_document_task
 from supabase import Client
 from typing import Any, Dict, List
 
@@ -81,7 +83,30 @@ async def upload_documents(
             # keep processing the rest of the batch instead of failing the request.
             results.append(DocumentUploadResult(file_name=file.filename, success=False, error=e.message))
 
-    if uploaded_doc_ids and background_tasks is not None:
+    if settings.CELERY_ENABLED:
+        for document_id in uploaded_doc_ids:
+            try:
+                process_document_task.delay(document_id)
+            except Exception:
+                logger.exception(
+                    "documents.task_enqueue_failed | document_id=%s",
+                    document_id,
+                )
+                try:
+                    pipeline_service.doc_repo.update_status(document_id, "flagged")
+                except Exception:
+                    logger.exception(
+                        "documents.task_enqueue_failure_status_update_failed | document_id=%s",
+                        document_id,
+                    )
+                for result in results:
+                    if result.document and str(result.document.id) == document_id:
+                        result.error = (
+                            "Upload succeeded, but processing could not be queued. "
+                            "Check Redis/Celery availability and retry processing."
+                        )
+                        break
+    elif uploaded_doc_ids and background_tasks is not None:
         background_tasks.add_task(pipeline_service.execute_batch, uploaded_doc_ids)
 
     return BatchUploadResponse(results=results)
@@ -153,9 +178,27 @@ def get_enhanced_page_image(
         signed = service.doc_repo.client.storage.from_(STORAGE_BUCKET).create_signed_url(storage_path, 300)
         url = signed.get("signedURL") if isinstance(signed, dict) else None
     except Exception:
+        logger.exception(
+            "documents.enhanced_image_lookup_failed | document_id=%s page_number=%s",
+            id,
+            page_number,
+        )
         url = None
     if not url:
-        raise ResourceNotFoundError("No enhanced image found for this page — it may not have finished processing yet")
+        logger.warning(
+            "documents.enhanced_image_missing | document_id=%s page_number=%s status=%s",
+            id,
+            page_number,
+            document.get("status"),
+        )
+        if document.get("status") in {"uploaded", "processing", "ocr_done"}:
+            raise ResourceNotFoundError(
+                "This document is still processing. The enhanced page image is available after processing finishes."
+            )
+        raise ResourceNotFoundError(
+            "No enhanced page image is stored for this page. A clean page still gets saved; "
+            "check the worker logs for an enhanced-image upload failure."
+        )
     return EnhancedPageImageResponse(url=url)
 
 @router.patch("/{id}/pages/{page_number}", response_model=DocumentPageResponse)
@@ -243,6 +286,8 @@ def process_document(
     current_user: Dict[str, Any] = Depends(RoleRequirement(["Reviewer", "Admin"])),
     pipeline_service: PipelineService = Depends(get_pipeline_service)
 ):
-    # Enqueue execution asynchronously inside the FastAPI event loop
-    background_tasks.add_task(pipeline_service.execute_analysis_pipeline, id)
-    return {"message": f"Processing pipeline initiated for document {id}"}
+    if settings.CELERY_ENABLED:
+        process_document_task.delay(id)
+    else:
+        background_tasks.add_task(pipeline_service.execute_analysis_pipeline, id)
+    return {"message": f"Processing pipeline queued for document {id}"}

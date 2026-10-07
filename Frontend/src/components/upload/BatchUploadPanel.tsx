@@ -1,12 +1,12 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
-import { UploadCloud, FileText, X, Loader2, CheckCircle2, AlertTriangle, Ban, Trash2 } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { ArrowRight, UploadCloud, FileText, X, Loader2, Ban } from "lucide-react";
 import { apiClient } from "@/services/api/client";
 import { useToast } from "@/context/ToastContext";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { Badge } from "@/components/ui/badge";
 
 const ALLOWED_TYPES = ["application/pdf", "image/png", "image/jpeg", "image/jpg"];
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
@@ -14,10 +14,8 @@ const MAX_BATCH_SIZE = 20;
 const TERMINAL_STATUSES = ["llm_done", "under_review", "approved", "flagged", "rejected", "completed", "failed"];
 
 interface TrackedDocument {
-  fileName: string;
   documentId?: string;
   status: string; // "failed" (upload-time) or a backend DocStatusEnum value
-  error?: string;
 }
 
 interface BatchUploadPanelProps {
@@ -27,13 +25,14 @@ interface BatchUploadPanelProps {
 }
 
 export function BatchUploadPanel({ caseId, onUploaded }: BatchUploadPanelProps) {
+  const router = useRouter();
   const toast = useToast();
 
   const [queuedFiles, setQueuedFiles] = useState<File[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [tracked, setTracked] = useState<TrackedDocument[]>([]);
-  const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set());
+  const [hasUploadedDocuments, setHasUploadedDocuments] = useState(false);
 
   const abortControllerRef = useRef<AbortController | null>(null);
   const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -143,10 +142,8 @@ export function BatchUploadPanel({ caseId, onUploaded }: BatchUploadPanelProps) 
     }
 
     const newTracked: TrackedDocument[] = result.data.results.map((r) => ({
-      fileName: r.file_name,
       documentId: r.document?.id,
       status: r.success ? r.document?.status || "processing" : "failed",
-      error: r.error,
     }));
 
     const succeeded = newTracked.filter((t) => t.status !== "failed").length;
@@ -156,6 +153,7 @@ export function BatchUploadPanel({ caseId, onUploaded }: BatchUploadPanelProps) 
     setQueuedFiles([]);
 
     if (succeeded > 0) {
+      setHasUploadedDocuments(true);
       toast.success(
         `${succeeded} document${succeeded === 1 ? "" : "s"} uploaded. Processing started.`,
         "Upload Complete"
@@ -165,36 +163,13 @@ export function BatchUploadPanel({ caseId, onUploaded }: BatchUploadPanelProps) 
     if (failed > 0) {
       toast.error(`${failed} file${failed === 1 ? "" : "s"} failed to upload`, "Some Files Failed");
     }
-
-    startPolling();
-  }
-
-  // Deletes a document that's still uploading/processing (or already done) —
-  // this is a soft-discard, not a request to actually interrupt whatever
-  // OCR/VLM work might be in flight for it server-side (see
-  // backend/app/services/doc_service.py::DocumentService.delete_document):
-  // the row and its storage file are gone right away, so it disappears from
-  // this list and stops being polled immediately, even if the backend
-  // pipeline for it is still mid-run.
-  async function handleDeleteTracked(documentId: string) {
-    setDeletingIds((prev) => new Set(prev).add(documentId));
-
-    const result = await apiClient.documents.delete(documentId);
-
-    setDeletingIds((prev) => {
-      const next = new Set(prev);
-      next.delete(documentId);
-      return next;
-    });
-
-    if (!result.success) {
-      toast.error(result.error || "Failed to delete document", "Delete Error");
-      return;
+    for (const fileResult of result.data.results) {
+      if (fileResult.error) {
+        toast.error(`${fileResult.file_name}: ${fileResult.error}`, "Processing Queue Error");
+      }
     }
 
-    setTracked((prev) => prev.filter((t) => t.documentId !== documentId));
-    toast.success("Document deleted", "Deleted");
-    onUploaded?.();
+    startPolling();
   }
 
   return (
@@ -308,53 +283,13 @@ export function BatchUploadPanel({ caseId, onUploaded }: BatchUploadPanelProps) 
         </Button>
       </div>
 
-      {tracked.length > 0 && (
-        <div className="flex flex-col gap-2 border-t pt-4">
-          <h4 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-            Uploaded this session
-          </h4>
-          <ul className="flex flex-col gap-2">
-            {tracked.map((t, index) => (
-              <li
-                key={`${t.fileName}-${index}`}
-                className="flex items-center justify-between gap-2 rounded-lg border border-border bg-background px-3 py-2 text-xs"
-              >
-                <span className="flex items-center gap-2 truncate">
-                  {t.status === "failed" ? (
-                    <AlertTriangle size={14} className="shrink-0 text-destructive" />
-                  ) : TERMINAL_STATUSES.includes(t.status) ? (
-                    <CheckCircle2 size={14} className="shrink-0 text-emerald-500" />
-                  ) : (
-                    <Loader2 size={14} className="shrink-0 animate-spin text-primary" />
-                  )}
-                  <span className="truncate font-medium">{t.fileName}</span>
-                </span>
-                <span className="flex shrink-0 items-center gap-2">
-                  <Badge
-                    variant={t.status === "failed" ? "destructive" : "outline"}
-                    className="shrink-0 text-[10px] font-bold uppercase"
-                    title={t.error}
-                  >
-                    {t.status}
-                  </Badge>
-                  {t.documentId && (
-                    <button
-                      onClick={() => handleDeleteTracked(t.documentId!)}
-                      disabled={deletingIds.has(t.documentId)}
-                      title="Delete this document"
-                      className="text-muted-foreground hover:text-destructive disabled:opacity-50"
-                    >
-                      {deletingIds.has(t.documentId) ? (
-                        <Loader2 size={13} className="animate-spin" />
-                      ) : (
-                        <Trash2 size={13} />
-                      )}
-                    </button>
-                  )}
-                </span>
-              </li>
-            ))}
-          </ul>
+      {hasUploadedDocuments && tracked.length > 0 && tracked.every((t) => TERMINAL_STATUSES.includes(t.status)) && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4">
+          <p className="text-sm text-muted-foreground">Processing finished. Review the extracted information and flagged documents.</p>
+          <Button size="sm" onClick={() => router.push(`/review?caseId=${caseId}`)}>
+            Open review workspace
+            <ArrowRight size={14} data-icon="inline-end" />
+          </Button>
         </div>
       )}
     </div>

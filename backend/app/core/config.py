@@ -29,6 +29,19 @@ class Settings(BaseSettings):
     ADMIN_EMAIL: str = Field(default="", validation_alias="ADMIN_EMAIL")
     ADMIN_PASSWORD: str = Field(default="", validation_alias="ADMIN_PASSWORD")
 
+    # Document processing can use the durable Celery queue when Redis is
+    # available. Local development keeps the existing FastAPI background-task
+    # path unless CELERY_ENABLED is explicitly enabled.
+    CELERY_ENABLED: bool = Field(default=False, validation_alias="CELERY_ENABLED")
+    CELERY_BROKER_URL: str = Field(
+        default="redis://localhost:6379/0",
+        validation_alias="CELERY_BROKER_URL",
+    )
+    CELERY_RESULT_BACKEND: str = Field(
+        default="redis://localhost:6379/1",
+        validation_alias="CELERY_RESULT_BACKEND",
+    )
+
     # ---- Document router (OCR vs VLM routing, app/services/document_router.py) ----
     # Handwritten-area ratio at or above which a page is routed to the VLM instead
     # of the (faster, cheaper) OCR path. ratio = handwritten box area / total box area.

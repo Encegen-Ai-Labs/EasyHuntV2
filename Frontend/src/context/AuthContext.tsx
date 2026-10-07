@@ -61,7 +61,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         } else if (storedRole) {
           setUser({
             id: localStorage.getItem("propverify_user_id") || "1",
-            email: "user@propverify.ai",
+            email: "user@example.com",
             role: (storedRole as UserRole) || "Reviewer",
           });
         }

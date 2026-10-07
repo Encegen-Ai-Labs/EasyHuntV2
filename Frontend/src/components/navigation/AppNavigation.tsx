@@ -34,7 +34,7 @@ export function AppNavigation() {
           </span>
           <div>
             <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-              PropVerify AI
+              EasyHuntV2
             </div>
             <div className="text-sm font-semibold leading-none">Risk Intelligence</div>
           </div>

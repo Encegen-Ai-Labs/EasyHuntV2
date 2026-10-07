@@ -4,7 +4,6 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Building2, Loader2, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useCreateCaseMutation } from "@/services/api/hooks";
@@ -44,17 +43,15 @@ export function CaseCreationPage() {
     <div className="min-h-screen bg-background px-4 py-10">
       <div className="mx-auto max-w-2xl">
         <div className="mb-7">
-          <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">PropVerify AI</p>
-          <h1 className="mt-1 text-3xl font-bold tracking-tight">Create Case</h1>
+          <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">EasyHuntV2</p>
+          <h1 className="mt-1 text-3xl font-bold tracking-tight">Create a case</h1>
         </div>
 
         <form onSubmit={handleSubmit}>
           <Card>
             <CardHeader className="border-b">
               <CardTitle>Case details</CardTitle>
-              <CardDescription>
-                Capture the property context. You&apos;ll upload documents on the next screen.
-              </CardDescription>
+              <CardDescription>Add a property name, survey number and optional location.</CardDescription>
             </CardHeader>
 
             <CardContent className="pt-6 flex flex-col gap-4">
@@ -90,7 +87,7 @@ export function CaseCreationPage() {
                 </label>
                 <Input
                   id="location"
-                  placeholder="Miami, FL"
+                  placeholder="Pune, Maharashtra"
                   value={location}
                   onChange={(e) => setLocation(e.target.value)}
                 />
@@ -109,7 +106,6 @@ export function CaseCreationPage() {
             </CardContent>
 
             <CardFooter className="flex items-center justify-between border-t">
-              <Badge variant="secondary">Case Wizard</Badge>
               <Button type="submit" size="sm" disabled={createCase.isPending} className="gap-2">
                 {createCase.isPending ? (
                   <>

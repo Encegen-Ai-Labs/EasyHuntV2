@@ -1,12 +1,15 @@
 "use client";
 
-import React, { useCallback, useEffect, useState } from "react";
-import { FileText, Loader2, RefreshCw } from "lucide-react";
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { AlertCircle, FileText, Loader2, RefreshCw, Trash2 } from "lucide-react";
 import { apiClient, type DocumentRecord } from "@/services/api/client";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { useToast } from "@/context/ToastContext";
 
 type BadgeVariant = "outline" | "secondary" | "destructive" | "default";
+const IN_PROGRESS_STATUSES = new Set(["uploaded", "processing", "ocr_done"]);
 
 const STATUS_VARIANT: Record<string, BadgeVariant> = {
   uploaded: "outline",
@@ -27,20 +30,40 @@ interface DocumentListProps {
 }
 
 export function DocumentList({ caseId, refreshKey }: DocumentListProps) {
-  const [documents, setDocuments] = useState<DocumentRecord[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const toast = useToast();
+  const [deletingDocumentId, setDeletingDocumentId] = useState<string | null>(null);
+  const {
+    data: documents = [],
+    isLoading,
+    isError,
+    error,
+    refetch,
+  } = useQuery({
+    queryKey: ["documents", caseId, "list", refreshKey ?? 0],
+    queryFn: async (): Promise<DocumentRecord[]> => {
+      const result = await apiClient.documents.listByCase(caseId);
+      if (!result.success) throw new Error(result.error || "Failed to load documents");
+      return result.data || [];
+    },
+    enabled: Boolean(caseId),
+    staleTime: 0,
+    refetchInterval: (query) =>
+      query.state.data?.some((doc) => IN_PROGRESS_STATUSES.has(doc.status)) ? 3000 : false,
+  });
 
-  const load = useCallback(async () => {
-    setIsLoading(true);
-    const result = await apiClient.documents.listByCase(caseId);
-    setDocuments(result.success && result.data ? result.data : []);
-    setIsLoading(false);
-  }, [caseId]);
+  async function handleDelete(documentId: string) {
+    setDeletingDocumentId(documentId);
+    const result = await apiClient.documents.delete(documentId);
+    setDeletingDocumentId(null);
 
-  useEffect(() => {
-    load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [load, refreshKey]);
+    if (!result.success) {
+      toast.error(result.error || "Failed to delete document", "Delete Error");
+      return;
+    }
+
+    toast.success("Document deleted.", "Deleted");
+    await refetch();
+  }
 
   if (isLoading) {
     return (
@@ -57,17 +80,24 @@ export function DocumentList({ caseId, refreshKey }: DocumentListProps) {
         <span className="text-xs text-muted-foreground">
           {documents.length} document{documents.length === 1 ? "" : "s"}
         </span>
-        <Button variant="ghost" size="sm" onClick={load} className="h-7 gap-1.5 text-xs">
+        <Button variant="ghost" size="sm" onClick={() => void refetch()} className="h-7 gap-1.5 text-xs">
           <RefreshCw size={12} />
           Refresh
         </Button>
       </div>
 
-      {documents.length === 0 ? (
+      {isError && (
+        <p className="flex items-center gap-2 rounded-md bg-destructive/10 px-3 py-2 text-xs text-destructive">
+          <AlertCircle size={14} />
+          {error instanceof Error ? error.message : "Unable to load documents."}
+        </p>
+      )}
+
+      {documents.length === 0 && !isError ? (
         <div className="py-8 text-center text-xs text-muted-foreground">
           No documents uploaded yet.
         </div>
-      ) : (
+      ) : documents.length > 0 ? (
         <ul className="flex flex-col gap-2">
           {documents.map((doc) => (
             <li
@@ -78,16 +108,33 @@ export function DocumentList({ caseId, refreshKey }: DocumentListProps) {
                 <FileText size={14} className="shrink-0 text-primary" />
                 <span className="truncate font-medium">{doc.file_name}</span>
               </span>
-              <Badge
-                variant={STATUS_VARIANT[doc.status] || "outline"}
-                className="shrink-0 text-[10px] font-bold uppercase"
-              >
-                {doc.status}
-              </Badge>
+              <span className="flex shrink-0 items-center gap-2">
+                <Badge
+                  variant={STATUS_VARIANT[doc.status] || "outline"}
+                  className="text-[10px] font-bold uppercase"
+                >
+                  {doc.status}
+                </Badge>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  title={`Delete ${doc.file_name}`}
+                  aria-label={`Delete ${doc.file_name}`}
+                  disabled={deletingDocumentId === doc.id}
+                  onClick={() => void handleDelete(doc.id)}
+                >
+                  {deletingDocumentId === doc.id ? (
+                    <Loader2 size={13} className="animate-spin" />
+                  ) : (
+                    <Trash2 size={13} />
+                  )}
+                </Button>
+              </span>
             </li>
           ))}
         </ul>
-      )}
+      ) : null}
     </div>
   );
 }

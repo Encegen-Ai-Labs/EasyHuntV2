@@ -12,8 +12,8 @@ const inter = Inter({
 });
 
 export const metadata = {
-  title: "PropVerify AI",
-  description: "AI Property Case & Document Analysis Platform",
+  title: "EasyHuntV2",
+  description: "Property document processing and review workspace",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

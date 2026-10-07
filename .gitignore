@@ -302,3 +302,9 @@ yarn-error.log*
 next-env.d.ts
 
 .claude/
+
+# fake-data sample renders of bank templates (local only)
+backend/templates/_sample_outputs/
+
+# real client source reports (never commit)
+backend/templates/_raw_originals/

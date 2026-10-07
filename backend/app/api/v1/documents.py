@@ -14,7 +14,6 @@ from app.core.config import settings
 from app.dependencies.db import get_supabase_client
 from app.dependencies.auth import RoleRequirement
 from app.core.exceptions import PropertySystemException, ResourceNotFoundError
-from app.tasks.document_tasks import process_document_task
 from supabase import Client
 from typing import Any, Dict, List
 
@@ -84,6 +83,10 @@ async def upload_documents(
             results.append(DocumentUploadResult(file_name=file.filename, success=False, error=e.message))
 
     if settings.CELERY_ENABLED:
+        # Imported lazily: Celery is only needed when the queue is enabled, so
+        # the API (and the test suite) start without it being importable.
+        from app.tasks.document_tasks import process_document_task
+
         for document_id in uploaded_doc_ids:
             try:
                 process_document_task.delay(document_id)
@@ -287,6 +290,8 @@ def process_document(
     pipeline_service: PipelineService = Depends(get_pipeline_service)
 ):
     if settings.CELERY_ENABLED:
+        from app.tasks.document_tasks import process_document_task
+
         process_document_task.delay(id)
     else:
         background_tasks.add_task(pipeline_service.execute_analysis_pipeline, id)

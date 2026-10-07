@@ -22,7 +22,6 @@ services:
     environment:
       CELERY_ENABLED: "true"
       CELERY_BROKER_URL: redis://redis:6379/0
-      CELERY_RESULT_BACKEND: redis://redis:6379/1
     depends_on:
       redis:
         condition: service_healthy
@@ -32,12 +31,13 @@ services:
       context: ./backend
     env_file:
       - ./backend/.env
-    command: sh -c 'celery -A app.tasks.celery_app:celery_app worker --loglevel=INFO --concurrency="$${CELERY_WORKER_CONCURRENCY:-3}"'
+    # Concurrency comes from CELERY_WORKER_CONCURRENCY (default 3, capped at 6
+    # in app/tasks/celery_app.py), not from a CLI flag, so the cap always applies.
+    command: celery -A app.tasks.celery_app:celery_app worker --loglevel=INFO
     restart: unless-stopped
     environment:
       CELERY_ENABLED: "true"
       CELERY_BROKER_URL: redis://redis:6379/0
-      CELERY_RESULT_BACKEND: redis://redis:6379/1
     depends_on:
       redis:
         condition: service_healthy

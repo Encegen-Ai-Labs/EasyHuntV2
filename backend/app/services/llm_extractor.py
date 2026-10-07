@@ -3,6 +3,7 @@ from google.genai import types
 import json
 import os
 import tempfile
+from app.services.rate_limit import is_rate_limit_error
 from typing import Dict, Any
 from dotenv import load_dotenv
 
@@ -195,6 +196,7 @@ def extract_structured_fields_from_text(text: str) -> Dict[str, Any]:
             "extracted": None,
             "model_used": "gemini-3.5-flash-lite",
             "error": str(e),
+            "rate_limited": is_rate_limit_error(e),
         }
 
 
@@ -285,7 +287,8 @@ def extract_from_image_path(image_path: str, mime_type: str | None = None) -> Di
             "raw_output": None,
             "extracted": None,
             "model_used": "gemini-3.5-flash-lite",
-            "error": str(e)
+            "error": str(e),
+            "rate_limited": is_rate_limit_error(e),
         }
 
 

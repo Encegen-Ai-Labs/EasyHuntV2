@@ -8,6 +8,7 @@ from PIL import Image
 from google.genai import types
 
 from app.services.llm_extractor import client_genai, _clean_json_response
+from app.services.rate_limit import is_rate_limit_error
 
 # 2026-08-21: replaced the older, narrower verbatim-only prompt with a more
 # detailed "forensic extraction" prompt (user-supplied, evaluated against the
@@ -133,7 +134,7 @@ def extract_page_text(image_bytes: bytes, mime_type: str = "image/png") -> Dict[
         )
         return {"success": True, "text": response.text.strip(), "error": None}
     except Exception as e:
-        return {"success": False, "text": None, "error": str(e)}
+        return {"success": False, "text": None, "error": str(e), "rate_limited": is_rate_limit_error(e)}
 
 
 # Delimiter separating the verbatim transcription from the structured-fields
@@ -251,7 +252,10 @@ def extract_page_text_and_fields(image_bytes: bytes, mime_type: str = "image/png
             "error": "Model returned invalid JSON in the fields block",
         }
     except Exception as e:
-        return {"success": False, "text": None, "extracted": None, "model_used": "gemini-3.5-flash-lite", "error": str(e)}
+        return {
+            "success": False, "text": None, "extracted": None, "model_used": "gemini-3.5-flash-lite",
+            "error": str(e), "rate_limited": is_rate_limit_error(e),
+        }
 
 
 def _cap_image_dimensions(img: Image.Image) -> Image.Image:

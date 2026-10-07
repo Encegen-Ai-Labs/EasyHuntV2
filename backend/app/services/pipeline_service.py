@@ -348,7 +348,10 @@ class PipelineService:
                 "status": "failed",
                 "case_id": case_id,
                 "document_id": doc_id,
-                "error": result["error"]
+                "error": result["error"],
+                # Lets the queue task retry later with backoff; ignored by the
+                # in-process path, which behaves exactly as before.
+                "rate_limited": bool(result.get("rate_limited")),
             }
 
         extracted = dict(result["extracted"])

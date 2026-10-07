@@ -37,9 +37,14 @@ class Settings(BaseSettings):
         default="redis://localhost:6379/0",
         validation_alias="CELERY_BROKER_URL",
     )
-    CELERY_RESULT_BACKEND: str = Field(
-        default="redis://localhost:6379/1",
-        validation_alias="CELERY_RESULT_BACKEND",
+    # Documents processed at once per worker process. Each document fans out to
+    # up to MAX_CONCURRENT_PAGES_PER_DOCUMENT concurrent Gemini calls, so the
+    # worst case in flight is workers x this x 4. Hard-capped in celery_app.py.
+    CELERY_WORKER_CONCURRENCY: int = Field(default=3, validation_alias="CELERY_WORKER_CONCURRENCY")
+    # Backoff when Gemini rate-limits a document: base * 2^attempt seconds, plus jitter.
+    CELERY_RATE_LIMIT_RETRIES: int = Field(default=5, validation_alias="CELERY_RATE_LIMIT_RETRIES")
+    CELERY_RATE_LIMIT_BACKOFF_SECONDS: int = Field(
+        default=30, validation_alias="CELERY_RATE_LIMIT_BACKOFF_SECONDS"
     )
 
     # ---- Document router (OCR vs VLM routing, app/services/document_router.py) ----

@@ -6,7 +6,7 @@ from app.core.exceptions import PermissionDeniedError
 from app.dependencies.auth import get_current_user
 from app.main import app
 from app.services.doc_service import DocumentService
-from app.services.search_service import SearchService, build_semantic_snippet, build_snippet
+from app.services.search_service import SearchOutcome, SearchService, build_semantic_snippet, build_snippet
 
 
 class FakeCaseRepo:
@@ -227,16 +227,16 @@ def test_search_case_semantic_falls_back_to_exact_when_query_embedding_fails(mon
 
 def test_search_route_returns_results_from_service():
     class StubSearchService:
-        def search_case(self, case_id, query, current_user, mode="exact"):
+        def search_case_with_status(self, case_id, query, current_user, mode="exact"):
             assert case_id == "case-1"
             assert query == "45"
-            return [{
+            return SearchOutcome(results=[{
                 "document_id": "11111111-1111-1111-1111-111111111111",
                 "document_name": "deed.pdf",
                 "page_number": 2,
                 "matched_in": "original",
                 "snippet": "...survey 45...",
-            }]
+            }])
 
     app.dependency_overrides[get_current_user] = lambda: {"id": "reviewer-1", "role": "Reviewer"}
     app.dependency_overrides[get_search_service] = lambda: StubSearchService()
@@ -260,7 +260,7 @@ def test_search_route_returns_results_from_service():
 
 def test_search_route_requires_q_param():
     class StubSearchService:
-        def search_case(self, case_id, query, current_user, mode="exact"):
+        def search_case_with_status(self, case_id, query, current_user, mode="exact"):
             raise AssertionError("service should not be reached when q is missing")
 
     app.dependency_overrides[get_current_user] = lambda: {"id": "reviewer-1", "role": "Reviewer"}
@@ -272,3 +272,145 @@ def test_search_route_requires_q_param():
     app.dependency_overrides.clear()
 
     assert response.status_code == 422
+
+
+# --- exact + similar (mixed) results ---
+
+REVIEWER = {"id": "reviewer-1", "role": "Reviewer"}
+
+
+def _mixed_service(monkeypatch, exact_pages, semantic_pages, embedding=(0.1, 0.2)):
+    from app.services import search_service as search_svc
+
+    doc_repo = FakeDocRepo()
+    doc_service = DocumentService(doc_repo=None, case_repo=FakeCaseRepo())
+    page_repo = FakeDocumentPageRepo(pages=exact_pages, semantic_pages=semantic_pages)
+    monkeypatch.setattr(search_svc, "embed_query", lambda q: list(embedding) if embedding else None)
+    return SearchService(doc_service, doc_repo, page_repo), page_repo
+
+
+EXACT_P1 = {"id": "p1", "document_id": "doc-1", "page_number": 1,
+            "original_text": "Sale deed of the plot", "matched_in": ["original"]}
+
+
+def test_exact_matches_come_first_then_similar_without_repeating_a_page(monkeypatch):
+    service, _ = _mixed_service(
+        monkeypatch,
+        exact_pages=[EXACT_P1],
+        semantic_pages=[
+            # the same page the exact search already found: must not be repeated
+            {"document_id": "doc-1", "page_number": 1, "original_text": "Sale deed of the plot", "similarity": 0.95},
+            {"document_id": "doc-1", "page_number": 4, "original_text": "Transfer of ownership recorded", "similarity": 0.61},
+            {"document_id": "doc-1", "page_number": 2, "original_text": "Conveyance of the property", "similarity": 0.74},
+        ],
+    )
+
+    outcome = service.search_case_with_status("case-1", "sale deed", REVIEWER, mode="semantic")
+
+    assert [(r["matched_in"], r["page_number"]) for r in outcome.results] == [
+        ("original", 1), ("semantic", 2), ("semantic", 4),
+    ]
+    assert [r.get("similarity") for r in outcome.results] == [None, 0.74, 0.61]  # similar ranked by score
+    assert outcome.similar_unavailable is False
+
+
+def test_exact_mode_never_calls_the_embedding_api_or_returns_similar(monkeypatch):
+    from app.services import search_service as search_svc
+
+    service, page_repo = _mixed_service(monkeypatch, [EXACT_P1], [])
+    monkeypatch.setattr(search_svc, "embed_query", lambda q: pytest.fail("embedding called in exact mode"))
+
+    outcome = service.search_case_with_status("case-1", "sale deed", REVIEWER, mode="exact")
+
+    assert [r["matched_in"] for r in outcome.results] == ["original"]
+    assert page_repo.last_semantic_call is None
+
+
+def test_similar_matches_below_the_minimum_similarity_are_dropped(monkeypatch):
+    from app.services import search_service as search_svc
+
+    monkeypatch.setattr(search_svc.settings, "SEARCH_MIN_SIMILARITY", 0.5)
+    service, _ = _mixed_service(
+        monkeypatch, [],
+        [
+            {"document_id": "doc-1", "page_number": 1, "original_text": "close", "similarity": 0.52},
+            {"document_id": "doc-1", "page_number": 2, "original_text": "far", "similarity": 0.41},
+            {"document_id": "doc-1", "page_number": 3, "original_text": "unscored", "similarity": None},
+        ],
+    )
+
+    results = service.search_case("case-1", "anything", REVIEWER, mode="semantic")
+
+    assert [r["page_number"] for r in results] == [1]
+
+
+def test_default_minimum_similarity_is_permissive():
+    from app.core.config import settings
+
+    assert settings.SEARCH_MIN_SIMILARITY <= 0.35
+
+
+def test_embedding_failure_keeps_exact_results_and_says_similar_is_unavailable(monkeypatch):
+    service, page_repo = _mixed_service(monkeypatch, [EXACT_P1], [], embedding=None)
+
+    outcome = service.search_case_with_status("case-1", "sale", REVIEWER, mode="semantic")
+
+    assert [r["matched_in"] for r in outcome.results] == ["original"]
+    assert outcome.similar_unavailable is True
+    assert page_repo.last_semantic_call is None
+
+
+def test_missing_embedding_rpc_keeps_exact_results(monkeypatch):
+    # e.g. migration 0005 not applied to the Supabase project.
+    service, page_repo = _mixed_service(monkeypatch, [EXACT_P1], [])
+
+    def boom(*args, **kwargs):
+        raise RuntimeError("function match_document_pages does not exist")
+
+    page_repo.search_by_case_semantic = boom
+
+    outcome = service.search_case_with_status("case-1", "sale", REVIEWER, mode="semantic")
+
+    assert [r["matched_in"] for r in outcome.results] == ["original"]
+    assert outcome.similar_unavailable is True
+
+
+def test_a_page_matching_in_both_columns_stays_two_exact_rows_before_similar(monkeypatch):
+    both = {**EXACT_P1, "matched_in": ["original", "english"], "english_text": "Sale deed of the plot"}
+    service, _ = _mixed_service(
+        monkeypatch, [both],
+        [{"document_id": "doc-1", "page_number": 9, "original_text": "other", "similarity": 0.7}],
+    )
+
+    results = service.search_case("case-1", "sale deed", REVIEWER, mode="semantic")
+
+    assert [r["matched_in"] for r in results] == ["original", "english", "semantic"]
+
+
+def test_search_route_exposes_similar_unavailable_and_order():
+    class StubSearchService:
+        def search_case_with_status(self, case_id, query, current_user, mode="exact"):
+            assert mode == "semantic"
+            return SearchOutcome(
+                results=[
+                    {"document_id": "11111111-1111-1111-1111-111111111111", "document_name": "a.pdf",
+                     "page_number": 1, "matched_in": "original", "snippet": "x"},
+                    {"document_id": "11111111-1111-1111-1111-111111111111", "document_name": "a.pdf",
+                     "page_number": 2, "matched_in": "semantic", "snippet": "y", "similarity": 0.66},
+                ],
+                similar_unavailable=False,
+            )
+
+    app.dependency_overrides[get_current_user] = lambda: REVIEWER
+    app.dependency_overrides[get_search_service] = lambda: StubSearchService()
+    response = TestClient(app).get(
+        "/api/v1/cases/case-1/search", params={"q": "x", "mode": "semantic"},
+        headers={"Authorization": "Bearer test-token"},
+    )
+    app.dependency_overrides.clear()
+
+    body = response.json()
+    assert response.status_code == 200
+    assert body["similar_unavailable"] is False
+    assert [r["matched_in"] for r in body["results"]] == ["original", "semantic"]
+    assert body["results"][1]["similarity"] == 0.66

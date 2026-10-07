@@ -1,0 +1,126 @@
+{
+  "version": 1,
+  "description": "Old field names that were merged into or renamed to a canonical name. Stored drafts that use an old name must be read as the canonical name for that template.",
+  "aliases": [
+    {
+      "template": "cholamandalam-title-report.docx",
+      "old": "mortgage_requirement",
+      "canonical": "mortgage_creatable",
+      "kind": "merge"
+    },
+    {
+      "template": "idfc-first-bank-title-report.docx",
+      "old": "property_tax_paid_status",
+      "canonical": "property_tax_payment_status",
+      "kind": "merge"
+    },
+    {
+      "template": "idfc-first-bank-title-report.docx",
+      "old": "search_challan_date",
+      "canonical": "search_date",
+      "kind": "merge"
+    },
+    {
+      "template": "kotak-mahindra-bank-title-report.docx",
+      "old": "search_challan_date",
+      "canonical": "search_date",
+      "kind": "merge"
+    },
+    {
+      "template": "shinhan-bank-title-report.docx",
+      "old": "part3_stamp_duty",
+      "canonical": "stamp_duty_status",
+      "kind": "merge"
+    },
+    {
+      "template": "tata-capital-title-report.docx",
+      "old": "part3_conversion_permission",
+      "canonical": "na_conversion_status",
+      "kind": "merge"
+    },
+    {
+      "template": "tata-capital-title-report.docx",
+      "old": "part3_govt_grant",
+      "canonical": "govt_grant_status",
+      "kind": "rename"
+    },
+    {
+      "template": "tata-capital-title-report.docx",
+      "old": "part3_land_use",
+      "canonical": "land_use_status",
+      "kind": "rename"
+    },
+    {
+      "template": "tata-capital-title-report.docx",
+      "old": "part3_leasehold_details",
+      "canonical": "leasehold_terms_details",
+      "kind": "rename"
+    },
+    {
+      "template": "tata-capital-title-report.docx",
+      "old": "part3_litigation",
+      "canonical": "litigation_status",
+      "kind": "rename"
+    },
+    {
+      "template": "tata-capital-title-report.docx",
+      "old": "part3_local_laws",
+      "canonical": "local_laws_effect",
+      "kind": "rename"
+    },
+    {
+      "template": "tata-capital-title-report.docx",
+      "old": "part3_minor_interest",
+      "canonical": "minor_claims",
+      "kind": "merge"
+    },
+    {
+      "template": "tata-capital-title-report.docx",
+      "old": "part3_municipal_limits",
+      "canonical": "municipal_limits_status",
+      "kind": "rename"
+    },
+    {
+      "template": "tata-capital-title-report.docx",
+      "old": "part3_municipal_mutation",
+      "canonical": "municipal_mutation_status",
+      "kind": "rename"
+    },
+    {
+      "template": "tata-capital-title-report.docx",
+      "old": "part3_other_permissions",
+      "canonical": "mortgage_approval_status",
+      "kind": "merge"
+    },
+    {
+      "template": "tata-capital-title-report.docx",
+      "old": "part3_revenue_mutation",
+      "canonical": "mutation_extract_status",
+      "kind": "merge"
+    },
+    {
+      "template": "tata-capital-title-report.docx",
+      "old": "part3_sanctions_reviewed",
+      "canonical": "sanctions_reviewed_status",
+      "kind": "rename"
+    },
+    {
+      "template": "tata-capital-title-report.docx",
+      "old": "part3_sarfaesi_enforceable",
+      "canonical": "sarfaesi_conclusion",
+      "kind": "merge"
+    },
+    {
+      "template": "tata-capital-title-report.docx",
+      "old": "part3_stamp_duty",
+      "canonical": "stamp_duty_status",
+      "kind": "merge"
+    },
+    {
+      "template": "tata-capital-title-report.docx",
+      "old": "part3_taxes_paid",
+      "canonical": "property_tax_payment_status",
+      "kind": "merge"
+    }
+  ]
+}

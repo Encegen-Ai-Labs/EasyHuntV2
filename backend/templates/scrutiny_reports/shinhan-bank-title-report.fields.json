@@ -1,0 +1,941 @@
+{
+  "template": "shinhan-bank-title-report.docx",
+  "bank": "Shinhan Bank",
+  "engine": "docxtpl (render with autoescape=True)",
+  "policy": {
+    "source_values": {
+      "extracted": "pulled from the case documents by extraction",
+      "drafted": "proposed by the system or written by the lawyer; always reviewed and confirmed by the lawyer",
+      "case_intake": "entered when the case is created or the report is issued",
+      "search_office": "taken from the Sub-Registrar / IGR search",
+      "profile": "the advocate's profile (name, place of signing)"
+    },
+    "review_levels": {
+      "must_confirm": "Legal judgement (opinion, marketability, adverse or critical remarks, tenure, SARFAESI enforceability, claims, permissions). Never auto-confirmed: a lawyer must explicitly confirm or write the value. No positive wording is drafted while the case has open red flags.",
+      "glance": "Factual checklist answer, letterhead, party or search detail that can be pre-filled from the extracted documents and shown for a quick lawyer check."
+    },
+    "rules": [
+      "A must_confirm field is never auto-confirmed: a lawyer must explicitly confirm or write its value.",
+      "The system must not draft \"clear and marketable\", \"no adverse entry\", \"enforceable\" or similar favourable wording for a must_confirm field while the case has open red flags.",
+      "A glance field may be pre-filled from extracted documents but is still shown to the lawyer for a quick check before the report is issued.",
+      "An unset field renders as empty text; no conclusion text is hard-coded in the template."
+    ]
+  },
+  "lawyer_review_required": [
+    "additional_precautions_status",
+    "agreement_for_sale_registered_status",
+    "agri_consolidation_status",
+    "agri_hidden_charges_status",
+    "agri_inspection_status",
+    "agri_khata_shares",
+    "agri_mutation_status",
+    "agri_self_cultivation_status",
+    "agri_surplus_land_status",
+    "cert_land_reforms_statement",
+    "cert_liability_statement",
+    "cert_minor_claims_statement",
+    "cert_mortgage_availability_statement",
+    "cert_prior_mortgage_statement",
+    "cert_ulc_statement",
+    "cert_undivided_minor_share_statement",
+    "certificate_title_statement",
+    "chain_steps",
+    "developer_authority_status",
+    "development_agreement_status",
+    "encumbrance_free_status",
+    "flat_independent_title_status",
+    "independent_title_verification_status",
+    "joint_family_property_status",
+    "land_revenue_dues_status",
+    "lease_tenure_details",
+    "local_central_laws_effect",
+    "local_laws_compliance_status",
+    "mortgage_approval_status",
+    "mortgage_creatable",
+    "mutation_extract_status",
+    "na_conversion_status",
+    "occupation_certificate_status",
+    "opinion_conclusion",
+    "original_title_deeds_status",
+    "owner_entity_status",
+    "personal_law_restriction_status",
+    "poa_mortgage_status",
+    "possession_documents_status",
+    "promoter_title_status",
+    "property_tax_paid_status",
+    "property_tax_payment_status",
+    "property_tenure",
+    "revenue_tenancy_effect",
+    "roc_charge_dates_nature",
+    "roc_charge_modifications",
+    "roc_charge_satisfaction",
+    "roc_charges_subsisting",
+    "roc_debentures_status",
+    "roc_receiver_status",
+    "roc_scheme_proceedings_status",
+    "share_certificate_status",
+    "society_conveyance_status",
+    "society_lien_requirement_status",
+    "society_membership_status",
+    "society_noc_status",
+    "stamp_duty_status",
+    "tax_acquisition_proceedings_status",
+    "tax_prior_permission_status",
+    "tax_receipt_perused_status",
+    "tax_recovery_action_status",
+    "title_marketable_status",
+    "title_nature",
+    "ulc_status",
+    "undivided_share_transfer_status"
+  ],
+  "must_confirm_fields": [
+    "additional_precautions_status",
+    "agri_consolidation_status",
+    "agri_hidden_charges_status",
+    "agri_surplus_land_status",
+    "cert_land_reforms_statement",
+    "cert_liability_statement",
+    "cert_minor_claims_statement",
+    "cert_mortgage_availability_statement",
+    "cert_prior_mortgage_statement",
+    "cert_ulc_statement",
+    "cert_undivided_minor_share_statement",
+    "certificate_title_statement",
+    "developer_authority_status",
+    "encumbrance_free_status",
+    "flat_independent_title_status",
+    "independent_title_verification_status",
+    "joint_family_property_status",
+    "lease_tenure_details",
+    "local_central_laws_effect",
+    "local_laws_compliance_status",
+    "mortgage_approval_status",
+    "mortgage_creatable",
+    "na_conversion_status",
+    "opinion_conclusion",
+    "personal_law_restriction_status",
+    "poa_mortgage_status",
+    "promoter_title_status",
+    "property_tenure",
+    "revenue_tenancy_effect",
+    "roc_charges_subsisting",
+    "roc_debentures_status",
+    "roc_receiver_status",
+    "roc_scheme_proceedings_status",
+    "tax_acquisition_proceedings_status",
+    "tax_prior_permission_status",
+    "tax_recovery_action_status",
+    "title_marketable_status",
+    "title_nature",
+    "ulc_status"
+  ],
+  "notes": [
+    "Different form from the Flairnetic reports: a 39-line bank questionnaire table plus Income Tax, Companies Act and Agricultural Land investigation tables. Every answer cell is a field.",
+    "Table rows are fixed: the question text and numbering stay as in the bank form (the source numbers two rows '18').",
+    "documents_verified is a row loop (Sr. No. is the loop index); documents_pre_disbursement and documents_post_disbursement are paragraph loops inside the answer to the equitable-mortgage question.",
+    "The mortgage_creatable answer replaces the source sentence 'YES - Equitable Mortgage by Deposit of Title Deeds is possible.'; the following line 'The following documents shall be obtained ...' stays fixed.",
+    "The seven numbered certificate points (cert_*) and the closing 'I certify that ...' paragraph were fixed conclusion text in the source and are now fields, so no conclusion wording is hard-coded.",
+    "'Name of the Title Holder' (top table) uses mortgagor_name (the intending buyers); present_owner_names is the seller, asked in question 1.",
+    "Tax rows 6 and 22(a) both ask about tax: row 6 is property_tax_payment_status, row 22(a) is property_tax_paid_status.",
+    "The source search note reads 'receipt dated <number>'; the wording is kept and the number goes in search_receipt_number.",
+    "The narration had a blank paragraph between the last 'we find' lines; it was removed so chain_steps is one loop.",
+    "documents_examined (the 'I have examined the documents in detail' list) is a separate loop from documents_verified, because the two lists are worded differently in the source.",
+    "The signature block has an 'Adv. {{ advocate_name }}' line added under 'For Flairnetic Advocates' (the source had none)."
+  ],
+  "open_questions": [
+    "Letter number and date of the bank's instruction letter were blank placeholders in the source; kept as optional bank_letter_number / bank_letter_date.",
+    "Question 2 ('absolute, clear and marketable title') and the certificate paragraph are lawyer conclusions; the source answered 'Yes.' with no qualification."
+  ],
+  "fields": [
+    {
+      "name": "additional_precautions_status",
+      "type": "text",
+      "required": true,
+      "source": "drafted",
+      "description": "Any additional documents or precautions required",
+      "review_level": "must_confirm",
+      "auto_confirm": false,
+      "draft_blocked_when_open_red_flags": true
+    },
+    {
+      "name": "advocate_name",
+      "type": "text",
+      "required": true,
+      "source": "profile",
+      "description": "Advocate name printed under 'For Flairnetic Advocates' (without the 'Adv.' prefix, which stays in the template)",
+      "review_level": "glance"
+    },
+    {
+      "name": "agreement_for_sale_registered_status",
+      "type": "text",
+      "required": true,
+      "source": "drafted",
+      "description": "Whether the Agreement for Sale is duly registered",
+      "review_level": "glance"
+    },
+    {
+      "name": "agri_consolidation_status",
+      "type": "text",
+      "required": true,
+      "source": "drafted",
+      "description": "Agricultural land: consolidation / acquisition proceedings and transferability",
+      "review_level": "must_confirm",
+      "auto_confirm": false,
+      "draft_blocked_when_open_red_flags": true
+    },
+    {
+      "name": "agri_hidden_charges_status",
+      "type": "text",
+      "required": true,
+      "source": "drafted",
+      "description": "Agricultural land: prior hidden charges",
+      "review_level": "must_confirm",
+      "auto_confirm": false,
+      "draft_blocked_when_open_red_flags": true
+    },
+    {
+      "name": "agri_inspection_status",
+      "type": "text",
+      "required": true,
+      "source": "drafted",
+      "description": "Agricultural land: spot inspection of land quality",
+      "review_level": "glance"
+    },
+    {
+      "name": "agri_khata_shares",
+      "type": "text",
+      "required": true,
+      "source": "drafted",
+      "description": "Agricultural land: shares in each khata if jointly owned",
+      "review_level": "glance"
+    },
+    {
+      "name": "agri_mutation_status",
+      "type": "text",
+      "required": true,
+      "source": "drafted",
+      "description": "Agricultural land: whether mutation is complete for existing or pending charges",
+      "review_level": "glance"
+    },
+    {
+      "name": "agri_self_cultivation_status",
+      "type": "text",
+      "required": true,
+      "source": "drafted",
+      "description": "Agricultural land: whether under self-cultivation",
+      "review_level": "glance"
+    },
+    {
+      "name": "agri_surplus_land_status",
+      "type": "text",
+      "required": true,
+      "source": "drafted",
+      "description": "Agricultural land: whether the land is surplus",
+      "review_level": "must_confirm",
+      "auto_confirm": false,
+      "draft_blocked_when_open_red_flags": true
+    },
+    {
+      "name": "bank_branch",
+      "type": "text",
+      "required": true,
+      "source": "case_intake",
+      "description": "Bank branch or city the report is addressed to",
+      "review_level": "glance"
+    },
+    {
+      "name": "bank_letter_date",
+      "type": "text",
+      "required": false,
+      "source": "case_intake",
+      "description": "Date of the bank's instruction letter (blank in the source)",
+      "review_level": "glance"
+    },
+    {
+      "name": "bank_letter_number",
+      "type": "text",
+      "required": false,
+      "source": "case_intake",
+      "description": "Bank's instruction letter number (blank in the source)",
+      "review_level": "glance"
+    },
+    {
+      "name": "cert_land_reforms_statement",
+      "type": "text",
+      "required": true,
+      "source": "drafted",
+      "description": "Certificate point 6: holding in accordance with the Land Reforms Act",
+      "review_level": "must_confirm",
+      "auto_confirm": false,
+      "draft_blocked_when_open_red_flags": true
+    },
+    {
+      "name": "cert_liability_statement",
+      "type": "text",
+      "required": true,
+      "source": "drafted",
+      "description": "Certificate point 4: liability fastened on the property",
+      "review_level": "must_confirm",
+      "auto_confirm": false,
+      "draft_blocked_when_open_red_flags": true
+    },
+    {
+      "name": "cert_minor_claims_statement",
+      "type": "text",
+      "required": true,
+      "source": "drafted",
+      "description": "Certificate point 2: claims of minors",
+      "review_level": "must_confirm",
+      "auto_confirm": false,
+      "draft_blocked_when_open_red_flags": true
+    },
+    {
+      "name": "cert_mortgage_availability_statement",
+      "type": "text",
+      "required": true,
+      "source": "drafted",
+      "description": "Certificate point 7: the mortgage, if created, will be perfect and available to the bank",
+      "review_level": "must_confirm",
+      "auto_confirm": false,
+      "draft_blocked_when_open_red_flags": true
+    },
+    {
+      "name": "cert_prior_mortgage_statement",
+      "type": "text",
+      "required": true,
+      "source": "drafted",
+      "description": "Certificate point 1: no prior mortgage or charge per the EC for the search period",
+      "review_level": "must_confirm",
+      "auto_confirm": false,
+      "draft_blocked_when_open_red_flags": true
+    },
+    {
+      "name": "cert_ulc_statement",
+      "type": "text",
+      "required": true,
+      "source": "drafted",
+      "description": "Certificate point 5: Urban Land Ceiling Act applicability",
+      "review_level": "must_confirm",
+      "auto_confirm": false,
+      "draft_blocked_when_open_red_flags": true
+    },
+    {
+      "name": "cert_undivided_minor_share_statement",
+      "type": "text",
+      "required": true,
+      "source": "drafted",
+      "description": "Certificate point 3: undivided share of minors",
+      "review_level": "must_confirm",
+      "auto_confirm": false,
+      "draft_blocked_when_open_red_flags": true
+    },
+    {
+      "name": "certificate_title_statement",
+      "type": "text",
+      "required": true,
+      "source": "drafted",
+      "description": "Part VI certificate paragraph: title deeds are evidence of title and the mortgage can be created",
+      "review_level": "must_confirm",
+      "auto_confirm": false,
+      "draft_blocked_when_open_red_flags": true
+    },
+    {
+      "name": "developer_authority_status",
+      "type": "text",
+      "required": true,
+      "source": "drafted",
+      "description": "Extent of authority of the developer / builder",
+      "review_level": "must_confirm",
+      "auto_confirm": false,
+      "draft_blocked_when_open_red_flags": true
+    },
+    {
+      "name": "development_agreement_status",
+      "type": "text",
+      "required": true,
+      "source": "drafted",
+      "description": "Development Agreement / Power of Attorney",
+      "review_level": "glance"
+    },
+    {
+      "name": "encumbrance_free_status",
+      "type": "text",
+      "required": true,
+      "source": "drafted",
+      "description": "Whether the property is free from encumbrances (with 13-year account of charges)",
+      "review_level": "must_confirm",
+      "auto_confirm": false,
+      "draft_blocked_when_open_red_flags": true
+    },
+    {
+      "name": "flat_independent_title_status",
+      "type": "text",
+      "required": true,
+      "source": "drafted",
+      "description": "For flats: how independent title and enjoyment of common areas is ensured",
+      "review_level": "must_confirm",
+      "auto_confirm": false,
+      "draft_blocked_when_open_red_flags": true
+    },
+    {
+      "name": "independent_title_verification_status",
+      "type": "text",
+      "required": true,
+      "source": "drafted",
+      "description": "Independent title verification of the land and/or building",
+      "review_level": "must_confirm",
+      "auto_confirm": false,
+      "draft_blocked_when_open_red_flags": true
+    },
+    {
+      "name": "joint_family_property_status",
+      "type": "text",
+      "required": true,
+      "source": "drafted",
+      "description": "Whether the property is joint family property",
+      "review_level": "must_confirm",
+      "auto_confirm": false,
+      "draft_blocked_when_open_red_flags": true
+    },
+    {
+      "name": "land_revenue_dues_status",
+      "type": "text",
+      "required": true,
+      "source": "drafted",
+      "description": "Whether any dues recoverable as land revenue are outstanding",
+      "review_level": "glance"
+    },
+    {
+      "name": "lease_tenure_details",
+      "type": "text",
+      "required": true,
+      "source": "drafted",
+      "description": "Tenure of the land if leased",
+      "review_level": "must_confirm",
+      "auto_confirm": false,
+      "draft_blocked_when_open_red_flags": true
+    },
+    {
+      "name": "local_central_laws_effect",
+      "type": "text",
+      "required": true,
+      "source": "drafted",
+      "description": "Whether local/state/municipal laws or central Acts (Land Acquisition, Urban Ceiling etc.) affect the title",
+      "review_level": "must_confirm",
+      "auto_confirm": false,
+      "draft_blocked_when_open_red_flags": true
+    },
+    {
+      "name": "local_laws_compliance_status",
+      "type": "text",
+      "required": true,
+      "source": "drafted",
+      "description": "Compliance with local/municipal laws, DCR and cooperative societies laws",
+      "review_level": "must_confirm",
+      "auto_confirm": false,
+      "draft_blocked_when_open_red_flags": true
+    },
+    {
+      "name": "mortgage_approval_status",
+      "type": "text",
+      "required": true,
+      "source": "drafted",
+      "description": "Whether approval for mortgage is required/obtained",
+      "review_level": "must_confirm",
+      "auto_confirm": false,
+      "draft_blocked_when_open_red_flags": true
+    },
+    {
+      "name": "mortgage_creatable",
+      "type": "text",
+      "required": true,
+      "source": "drafted",
+      "description": "Whether the mortgage can be created (e.g. Yes)",
+      "review_level": "must_confirm",
+      "auto_confirm": false,
+      "draft_blocked_when_open_red_flags": true
+    },
+    {
+      "name": "mortgage_joining_party_names",
+      "type": "text",
+      "required": true,
+      "source": "extracted",
+      "description": "Persons who should join in creating the mortgage",
+      "review_level": "glance"
+    },
+    {
+      "name": "mortgagor_name",
+      "type": "text",
+      "required": true,
+      "source": "extracted",
+      "description": "Mortgagor / owner name(s) as they should read in the opinion",
+      "review_level": "glance"
+    },
+    {
+      "name": "mutation_extract_status",
+      "type": "text",
+      "required": true,
+      "source": "drafted",
+      "description": "Revenue/mutation extracts available",
+      "review_level": "glance"
+    },
+    {
+      "name": "na_conversion_status",
+      "type": "text",
+      "required": true,
+      "source": "drafted",
+      "description": "Whether the land was converted to non-agricultural use by competent authority",
+      "review_level": "must_confirm",
+      "auto_confirm": false,
+      "draft_blocked_when_open_red_flags": true
+    },
+    {
+      "name": "occupation_certificate_status",
+      "type": "text",
+      "required": true,
+      "source": "drafted",
+      "description": "Occupation / completion certificate status",
+      "review_level": "glance"
+    },
+    {
+      "name": "opinion_conclusion",
+      "type": "text",
+      "required": true,
+      "source": "drafted",
+      "description": "Remainder of the opinion after the ownership clause: title, mortgage ability, enforceability, any conditions",
+      "review_level": "must_confirm",
+      "auto_confirm": false,
+      "draft_blocked_when_open_red_flags": true
+    },
+    {
+      "name": "original_title_deeds_status",
+      "type": "text",
+      "required": true,
+      "source": "drafted",
+      "description": "Whether the latest and immediately previous title deeds are available in original",
+      "review_level": "glance"
+    },
+    {
+      "name": "owner_entity_status",
+      "type": "text",
+      "required": true,
+      "source": "drafted",
+      "description": "Constitution of the owner (individual, company, firm, trust etc.) and its effect on title",
+      "review_level": "glance"
+    },
+    {
+      "name": "personal_law_restriction_status",
+      "type": "text",
+      "required": true,
+      "source": "drafted",
+      "description": "Restriction under personal laws on holding the property",
+      "review_level": "must_confirm",
+      "auto_confirm": false,
+      "draft_blocked_when_open_red_flags": true
+    },
+    {
+      "name": "poa_mortgage_status",
+      "type": "text",
+      "required": true,
+      "source": "drafted",
+      "description": "Whether the mortgage is created by a POA holder; genuineness and validity of the POA",
+      "review_level": "must_confirm",
+      "auto_confirm": false,
+      "draft_blocked_when_open_red_flags": true
+    },
+    {
+      "name": "possession_documents_status",
+      "type": "text",
+      "required": true,
+      "source": "drafted",
+      "description": "Occupancy certificate / allotment letter / letter of possession",
+      "review_level": "glance"
+    },
+    {
+      "name": "present_owner_names",
+      "type": "text",
+      "required": true,
+      "source": "extracted",
+      "description": "Present owner(s) of the property",
+      "review_level": "glance"
+    },
+    {
+      "name": "promoter_title_status",
+      "type": "text",
+      "required": true,
+      "source": "drafted",
+      "description": "Promoter's / land owner's title to the land or building",
+      "review_level": "must_confirm",
+      "auto_confirm": false,
+      "draft_blocked_when_open_red_flags": true
+    },
+    {
+      "name": "property_description",
+      "type": "text",
+      "required": true,
+      "source": "extracted",
+      "description": "Full property description paragraph, including boundaries if any",
+      "review_level": "glance"
+    },
+    {
+      "name": "property_tax_paid_status",
+      "type": "text",
+      "required": true,
+      "source": "drafted",
+      "description": "Year up to which property tax / society charges paid",
+      "review_level": "glance"
+    },
+    {
+      "name": "property_tax_payment_status",
+      "type": "text",
+      "required": true,
+      "source": "drafted",
+      "description": "Confirmation of property tax payment in current owner's name",
+      "review_level": "glance"
+    },
+    {
+      "name": "property_tenure",
+      "type": "choice",
+      "required": true,
+      "source": "drafted",
+      "description": "Freehold/leasehold; also drives the opinion wording (only Freehold and Leasehold produce an ownership clause)",
+      "options": [
+        "Freehold",
+        "Leasehold",
+        "Govt. land",
+        "Others"
+      ],
+      "review_level": "must_confirm",
+      "auto_confirm": false,
+      "draft_blocked_when_open_red_flags": true
+    },
+    {
+      "name": "property_type",
+      "type": "text",
+      "required": true,
+      "source": "case_intake",
+      "description": "Type of property (e.g. Commercial)",
+      "review_level": "glance"
+    },
+    {
+      "name": "reference_number",
+      "type": "text",
+      "required": true,
+      "source": "case_intake",
+      "description": "Firm/bank reference number printed on the report",
+      "review_level": "glance"
+    },
+    {
+      "name": "report_date",
+      "type": "date",
+      "required": true,
+      "source": "case_intake",
+      "description": "Date of the report",
+      "review_level": "glance"
+    },
+    {
+      "name": "revenue_tenancy_effect",
+      "type": "text",
+      "required": true,
+      "source": "drafted",
+      "description": "Affected by revenue and tenancy regulations, and to what extent",
+      "review_level": "must_confirm",
+      "auto_confirm": false,
+      "draft_blocked_when_open_red_flags": true
+    },
+    {
+      "name": "roc_charge_dates_nature",
+      "type": "text",
+      "required": true,
+      "source": "drafted",
+      "description": "Dates, nature and extent of each charge (ROC)",
+      "review_level": "glance"
+    },
+    {
+      "name": "roc_charge_modifications",
+      "type": "text",
+      "required": true,
+      "source": "drafted",
+      "description": "Modifications of charges (ROC)",
+      "review_level": "glance"
+    },
+    {
+      "name": "roc_charge_satisfaction",
+      "type": "text",
+      "required": true,
+      "source": "drafted",
+      "description": "Satisfaction of charge recorded in the previous 6 months (ROC)",
+      "review_level": "glance"
+    },
+    {
+      "name": "roc_charges_subsisting",
+      "type": "text",
+      "required": true,
+      "source": "drafted",
+      "description": "Charges subsisting on the property per the ROC register (company owners only)",
+      "review_level": "must_confirm",
+      "auto_confirm": false,
+      "draft_blocked_when_open_red_flags": true
+    },
+    {
+      "name": "roc_debentures_status",
+      "type": "text",
+      "required": true,
+      "source": "drafted",
+      "description": "Debentures issued by the company and charges securing them",
+      "review_level": "must_confirm",
+      "auto_confirm": false,
+      "draft_blocked_when_open_red_flags": true
+    },
+    {
+      "name": "roc_receiver_status",
+      "type": "text",
+      "required": true,
+      "source": "drafted",
+      "description": "Whether a receiver or manager of the company has been appointed",
+      "review_level": "must_confirm",
+      "auto_confirm": false,
+      "draft_blocked_when_open_red_flags": true
+    },
+    {
+      "name": "roc_scheme_proceedings_status",
+      "type": "text",
+      "required": true,
+      "source": "drafted",
+      "description": "Pending proceedings or orders under the Companies Act schemes provisions",
+      "review_level": "must_confirm",
+      "auto_confirm": false,
+      "draft_blocked_when_open_red_flags": true
+    },
+    {
+      "name": "search_challan_number",
+      "type": "text",
+      "required": true,
+      "source": "search_office",
+      "description": "Search challan number",
+      "review_level": "glance"
+    },
+    {
+      "name": "search_period_from_year",
+      "type": "number",
+      "required": true,
+      "source": "search_office",
+      "description": "First year covered by the Index-II search",
+      "review_level": "glance"
+    },
+    {
+      "name": "search_period_to_year",
+      "type": "number",
+      "required": true,
+      "source": "search_office",
+      "description": "Last year covered by the Index-II search",
+      "review_level": "glance"
+    },
+    {
+      "name": "search_period_years",
+      "type": "number",
+      "required": true,
+      "source": "search_office",
+      "description": "Number of years searched",
+      "review_level": "glance"
+    },
+    {
+      "name": "search_receipt_number",
+      "type": "text",
+      "required": true,
+      "source": "search_office",
+      "description": "Search receipt number",
+      "review_level": "glance"
+    },
+    {
+      "name": "share_certificate_status",
+      "type": "text",
+      "required": true,
+      "source": "drafted",
+      "description": "Share certificate",
+      "review_level": "glance"
+    },
+    {
+      "name": "society_conveyance_status",
+      "type": "text",
+      "required": true,
+      "source": "drafted",
+      "description": "Conveyance in favour of the society",
+      "review_level": "glance"
+    },
+    {
+      "name": "society_lien_requirement_status",
+      "type": "text",
+      "required": true,
+      "source": "drafted",
+      "description": "Special requirements if the society refuses to note the bank lien",
+      "review_level": "glance"
+    },
+    {
+      "name": "society_membership_status",
+      "type": "text",
+      "required": true,
+      "source": "drafted",
+      "description": "Membership details in the society",
+      "review_level": "glance"
+    },
+    {
+      "name": "society_noc_status",
+      "type": "text",
+      "required": true,
+      "source": "drafted",
+      "description": "No-objection letter from the society",
+      "review_level": "glance"
+    },
+    {
+      "name": "stamp_duty_status",
+      "type": "text",
+      "required": true,
+      "source": "drafted",
+      "description": "Q15 stamp duty / e-stamp verification",
+      "review_level": "glance"
+    },
+    {
+      "name": "tax_acquisition_proceedings_status",
+      "type": "text",
+      "required": true,
+      "source": "drafted",
+      "description": "Chapter XX-A / XX-C compliance and any acquisition proceedings",
+      "review_level": "must_confirm",
+      "auto_confirm": false,
+      "draft_blocked_when_open_red_flags": true
+    },
+    {
+      "name": "tax_prior_permission_status",
+      "type": "text",
+      "required": true,
+      "source": "drafted",
+      "description": "Whether prior permission of the assessing officer under section 281 is required for transfer",
+      "review_level": "must_confirm",
+      "auto_confirm": false,
+      "draft_blocked_when_open_red_flags": true
+    },
+    {
+      "name": "tax_receipt_perused_status",
+      "type": "text",
+      "required": true,
+      "source": "drafted",
+      "description": "Whether the original property tax receipt was perused",
+      "review_level": "glance"
+    },
+    {
+      "name": "tax_recovery_action_status",
+      "type": "text",
+      "required": true,
+      "source": "drafted",
+      "description": "Whether action was initiated by the Tax Recovery Officer under section 222",
+      "review_level": "must_confirm",
+      "auto_confirm": false,
+      "draft_blocked_when_open_red_flags": true
+    },
+    {
+      "name": "title_marketable_status",
+      "type": "text",
+      "required": true,
+      "source": "drafted",
+      "description": "Whether the party has absolute, clear and marketable title and can create a valid mortgage",
+      "review_level": "must_confirm",
+      "auto_confirm": false,
+      "draft_blocked_when_open_red_flags": true
+    },
+    {
+      "name": "title_nature",
+      "type": "text",
+      "required": true,
+      "source": "drafted",
+      "description": "Nature of the title of the owner (full ownership, tenancy, occupancy, possessory etc.)",
+      "review_level": "must_confirm",
+      "auto_confirm": false,
+      "draft_blocked_when_open_red_flags": true
+    },
+    {
+      "name": "ulc_status",
+      "type": "text",
+      "required": true,
+      "source": "drafted",
+      "description": "Urban Land Ceiling Act status",
+      "review_level": "must_confirm",
+      "auto_confirm": false,
+      "draft_blocked_when_open_red_flags": true
+    },
+    {
+      "name": "undivided_share_transfer_status",
+      "type": "text",
+      "required": true,
+      "source": "drafted",
+      "description": "Transfer of undivided share of land",
+      "review_level": "glance"
+    }
+  ],
+  "loops": [
+    {
+      "name": "chain_steps",
+      "type": "list",
+      "item_type": "string",
+      "required": true,
+      "min_items": 1,
+      "source": "drafted",
+      "description": "Chain-of-title narration, one paragraph per step",
+      "review_level": "glance"
+    },
+    {
+      "name": "documents_examined",
+      "type": "list",
+      "item_type": "object",
+      "required": false,
+      "min_items": 0,
+      "source": "extracted",
+      "description": "Documents examined, listed again in the certificate ('I have examined the documents in detail')",
+      "item_fields": [
+        "description"
+      ],
+      "review_level": "glance"
+    },
+    {
+      "name": "documents_post_disbursement",
+      "type": "list",
+      "item_type": "object",
+      "required": false,
+      "min_items": 0,
+      "source": "extracted",
+      "description": "Documents post-disbursement; NONE label prints when empty",
+      "item_fields": [
+        "description"
+      ],
+      "review_level": "glance"
+    },
+    {
+      "name": "documents_pre_disbursement",
+      "type": "list",
+      "item_type": "object",
+      "required": false,
+      "min_items": 0,
+      "source": "extracted",
+      "description": "Documents under 'Prior to Disbursement' (Kotak) - mapping to be confirmed with the lawyer",
+      "item_fields": [
+        "description"
+      ],
+      "review_level": "glance"
+    },
+    {
+      "name": "documents_verified",
+      "type": "list",
+      "item_type": "object",
+      "required": true,
+      "min_items": 0,
+      "source": "extracted",
+      "description": "Documents scrutinized: date, description and whether original or copy",
+      "item_fields": [
+        "date",
+        "description",
+        "form"
+      ],
+      "review_level": "glance"
+    }
+  ]
+}

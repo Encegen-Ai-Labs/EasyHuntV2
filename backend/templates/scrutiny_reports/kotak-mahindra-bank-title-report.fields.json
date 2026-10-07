@@ -1,0 +1,368 @@
+{
+  "template": "kotak-mahindra-bank-title-report.docx",
+  "bank": "Kotak Mahindra Bank",
+  "engine": "docxtpl (render with autoescape=True)",
+  "policy": {
+    "source_values": {
+      "extracted": "pulled from the case documents by extraction",
+      "drafted": "proposed by the system or written by the lawyer; always reviewed and confirmed by the lawyer",
+      "case_intake": "entered when the case is created or the report is issued",
+      "search_office": "taken from the Sub-Registrar / IGR search",
+      "profile": "the advocate's profile (name, place of signing)"
+    },
+    "review_levels": {
+      "must_confirm": "Legal judgement (opinion, marketability, adverse or critical remarks, tenure, SARFAESI enforceability, claims, permissions). Never auto-confirmed: a lawyer must explicitly confirm or write the value. No positive wording is drafted while the case has open red flags.",
+      "glance": "Factual checklist answer, letterhead, party or search detail that can be pre-filled from the extracted documents and shown for a quick lawyer check."
+    },
+    "rules": [
+      "A must_confirm field is never auto-confirmed: a lawyer must explicitly confirm or write its value.",
+      "The system must not draft \"clear and marketable\", \"no adverse entry\", \"enforceable\" or similar favourable wording for a must_confirm field while the case has open red flags.",
+      "A glance field may be pre-filled from extracted documents but is still shown to the lawyer for a quick check before the report is issued.",
+      "An unset field renders as empty text; no conclusion text is hard-coded in the template."
+    ]
+  },
+  "lawyer_review_required": [
+    "adverse_remarks",
+    "chain_steps",
+    "deviations",
+    "government_claims",
+    "land_agricultural_status",
+    "minor_claims",
+    "mortgage_creatable",
+    "opinion_conclusion",
+    "property_tax_payment_status",
+    "property_tenure",
+    "sanctions_required",
+    "sarfaesi_conclusion",
+    "search_conclusion"
+  ],
+  "must_confirm_fields": [
+    "adverse_remarks",
+    "deviations",
+    "government_claims",
+    "minor_claims",
+    "mortgage_creatable",
+    "opinion_conclusion",
+    "property_tenure",
+    "sanctions_required",
+    "sarfaesi_conclusion",
+    "search_conclusion"
+  ],
+  "notes": [
+    "documents_post_disbursement: the original had no item paragraphs; one loop block was added.",
+    "The mutation question in the original has no answer line, so no field exists for it."
+  ],
+  "open_questions": [
+    "CONFIRM WITH THE LAWYER: mapping of the two pre-disbursement lists. 'PRE DISBURSEMENT-' (3 items in the source) -> documents_initial_pre_disbursement; 'Prior to Disbursement' (7 items) -> documents_pre_disbursement."
+  ],
+  "fields": [
+    {
+      "name": "adverse_remarks",
+      "type": "text",
+      "required": true,
+      "source": "drafted",
+      "description": "Adverse remarks on title; no default",
+      "review_level": "must_confirm",
+      "auto_confirm": false,
+      "draft_blocked_when_open_red_flags": true
+    },
+    {
+      "name": "advocate_name",
+      "type": "text",
+      "required": true,
+      "source": "profile",
+      "description": "Advocate name printed in the signature / searcher line (without the 'Adv.' prefix, which stays in the template)",
+      "review_level": "glance"
+    },
+    {
+      "name": "advocate_place",
+      "type": "text",
+      "required": true,
+      "source": "profile",
+      "description": "Place of signing (e.g. Pune)",
+      "review_level": "glance"
+    },
+    {
+      "name": "bank_branch",
+      "type": "text",
+      "required": true,
+      "source": "case_intake",
+      "description": "Bank branch or city the report is addressed to",
+      "review_level": "glance"
+    },
+    {
+      "name": "borrower_name",
+      "type": "text",
+      "required": true,
+      "source": "case_intake",
+      "description": "Borrower name(s)",
+      "review_level": "glance"
+    },
+    {
+      "name": "government_claims",
+      "type": "text",
+      "required": true,
+      "source": "drafted",
+      "description": "Government claims on the property",
+      "review_level": "must_confirm",
+      "auto_confirm": false,
+      "draft_blocked_when_open_red_flags": true
+    },
+    {
+      "name": "land_agricultural_status",
+      "type": "choice",
+      "required": true,
+      "source": "drafted",
+      "description": "Agricultural / non-agricultural land",
+      "options": [
+        "Agricultural land",
+        "Non-Agricultural land"
+      ],
+      "review_level": "glance"
+    },
+    {
+      "name": "minor_claims",
+      "type": "text",
+      "required": true,
+      "source": "drafted",
+      "description": "Minor's or other claims",
+      "review_level": "must_confirm",
+      "auto_confirm": false,
+      "draft_blocked_when_open_red_flags": true
+    },
+    {
+      "name": "mortgage_creatable",
+      "type": "text",
+      "required": true,
+      "source": "drafted",
+      "description": "Whether the mortgage can be created (e.g. Yes)",
+      "review_level": "must_confirm",
+      "auto_confirm": false,
+      "draft_blocked_when_open_red_flags": true
+    },
+    {
+      "name": "mortgage_type",
+      "type": "choice",
+      "required": true,
+      "source": "case_intake",
+      "description": "Type of mortgage to be created (printed in headings; Tata prints it upper-case)",
+      "options": [
+        "Equitable",
+        "Registered",
+        "Equitable/Registered"
+      ],
+      "review_level": "glance"
+    },
+    {
+      "name": "mortgagor_name",
+      "type": "text",
+      "required": true,
+      "source": "extracted",
+      "description": "Mortgagor / owner name(s) as they should read in the opinion",
+      "review_level": "glance"
+    },
+    {
+      "name": "opinion_conclusion",
+      "type": "text",
+      "required": true,
+      "source": "drafted",
+      "description": "Remainder of the opinion after the ownership clause: title, mortgage ability, enforceability, any conditions",
+      "review_level": "must_confirm",
+      "auto_confirm": false,
+      "draft_blocked_when_open_red_flags": true
+    },
+    {
+      "name": "property_description",
+      "type": "text",
+      "required": true,
+      "source": "extracted",
+      "description": "Full property description paragraph, including boundaries if any",
+      "review_level": "glance"
+    },
+    {
+      "name": "property_tax_payment_status",
+      "type": "text",
+      "required": true,
+      "source": "drafted",
+      "description": "Confirmation of property tax payment in current owner's name",
+      "review_level": "glance"
+    },
+    {
+      "name": "property_tenure",
+      "type": "choice",
+      "required": true,
+      "source": "drafted",
+      "description": "Freehold/leasehold; also drives the opinion wording (only Freehold and Leasehold produce an ownership clause)",
+      "options": [
+        "Freehold",
+        "Leasehold",
+        "Govt. land",
+        "Others"
+      ],
+      "review_level": "must_confirm",
+      "auto_confirm": false,
+      "draft_blocked_when_open_red_flags": true
+    },
+    {
+      "name": "report_date",
+      "type": "date",
+      "required": true,
+      "source": "case_intake",
+      "description": "Date of the report",
+      "review_level": "glance"
+    },
+    {
+      "name": "sanctions_required",
+      "type": "text",
+      "required": true,
+      "source": "drafted",
+      "description": "Sanctions/permissions/NOCs/plans still to be obtained",
+      "review_level": "must_confirm",
+      "auto_confirm": false,
+      "draft_blocked_when_open_red_flags": true
+    },
+    {
+      "name": "sarfaesi_conclusion",
+      "type": "text",
+      "required": true,
+      "source": "drafted",
+      "description": "SARFAESI enforceability statement",
+      "review_level": "must_confirm",
+      "auto_confirm": false,
+      "draft_blocked_when_open_red_flags": true
+    },
+    {
+      "name": "search_challan_number",
+      "type": "text",
+      "required": true,
+      "source": "search_office",
+      "description": "Search challan number",
+      "review_level": "glance"
+    },
+    {
+      "name": "search_conclusion",
+      "type": "text",
+      "required": true,
+      "source": "drafted",
+      "description": "Conclusion of the encumbrance search (e.g. whether any adverse entry was found)",
+      "review_level": "must_confirm",
+      "auto_confirm": false,
+      "draft_blocked_when_open_red_flags": true
+    },
+    {
+      "name": "search_date",
+      "type": "date",
+      "required": true,
+      "source": "search_office",
+      "description": "Search challan date",
+      "review_level": "glance"
+    },
+    {
+      "name": "search_period_years",
+      "type": "number",
+      "required": true,
+      "source": "search_office",
+      "description": "Number of years searched",
+      "review_level": "glance"
+    },
+    {
+      "name": "search_receipt_number",
+      "type": "text",
+      "required": true,
+      "source": "search_office",
+      "description": "Search receipt number",
+      "review_level": "glance"
+    }
+  ],
+  "loops": [
+    {
+      "name": "chain_steps",
+      "type": "list",
+      "item_type": "string",
+      "required": true,
+      "min_items": 1,
+      "source": "drafted",
+      "description": "Chain-of-title narration, one paragraph per step",
+      "review_level": "glance"
+    },
+    {
+      "name": "completion_certificates",
+      "type": "list",
+      "item_type": "string",
+      "required": false,
+      "min_items": 0,
+      "source": "extracted",
+      "description": "Commencement/completion/occupation certificates, one per entry",
+      "review_level": "glance"
+    },
+    {
+      "name": "deviations",
+      "type": "list",
+      "item_type": "object",
+      "required": false,
+      "min_items": 0,
+      "source": "drafted",
+      "description": "Deviations from the bank guidelines; empty list = none recorded",
+      "item_fields": [
+        "deviation",
+        "implications",
+        "mitigation"
+      ],
+      "review_level": "must_confirm",
+      "auto_confirm": false,
+      "draft_blocked_when_open_red_flags": true
+    },
+    {
+      "name": "documents_initial_pre_disbursement",
+      "type": "list",
+      "item_type": "object",
+      "required": false,
+      "min_items": 0,
+      "source": "extracted",
+      "description": "Documents under 'PRE DISBURSEMENT-' (Kotak) - mapping to be confirmed with the lawyer",
+      "item_fields": [
+        "description"
+      ],
+      "review_level": "glance"
+    },
+    {
+      "name": "documents_post_disbursement",
+      "type": "list",
+      "item_type": "object",
+      "required": false,
+      "min_items": 0,
+      "source": "extracted",
+      "description": "Documents post-disbursement; NONE label prints when empty",
+      "item_fields": [
+        "description"
+      ],
+      "review_level": "glance"
+    },
+    {
+      "name": "documents_pre_disbursement",
+      "type": "list",
+      "item_type": "object",
+      "required": false,
+      "min_items": 0,
+      "source": "extracted",
+      "description": "Documents under 'Prior to Disbursement' (Kotak) - mapping to be confirmed with the lawyer",
+      "item_fields": [
+        "description"
+      ],
+      "review_level": "glance"
+    },
+    {
+      "name": "documents_verified",
+      "type": "list",
+      "item_type": "object",
+      "required": true,
+      "min_items": 1,
+      "source": "extracted",
+      "description": "Documents verified, one full description each",
+      "item_fields": [
+        "description"
+      ],
+      "review_level": "glance"
+    }
+  ]
+}

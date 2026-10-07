@@ -44,8 +44,12 @@ docker compose ps
 
 The API is available at `http://localhost:8000`; its OpenAPI page is
 `http://localhost:8000/docs`. The default Celery worker processes up to three
-documents at once. Page-level processing can add further concurrency, so
-consider provider limits before increasing worker capacity.
+documents at once (`CELERY_WORKER_CONCURRENCY`, hard-capped at 6 in
+`app/tasks/celery_app.py`). Each document also runs up to four pages
+concurrently, so worst-case simultaneous Gemini calls are
+workers x concurrency x 4 (12 by default). Consider provider limits before
+raising it. Documents that Gemini rate-limits are retried automatically with
+exponential backoff.
 
 Useful operations:
 
@@ -68,7 +72,7 @@ Docker Desktop must remain running while these services are in use.
 Open a second PowerShell window:
 
 ```powershell
-cd C:\Users\AAAA\Desktop\ai-property\EasyHuntV2\Frontend
+cd Frontend
 npm install
 npm run dev
 ```
@@ -84,6 +88,32 @@ project's Python environment and keep `CELERY_ENABLED=false`. The existing
 FastAPI background-task processing path is used in that mode. Do not enable
 Celery locally unless Redis and at least one Celery worker are also running and
 reachable by the API.
+
+## Verify a real worker (first-time check)
+
+Nobody had built this stack before it was added, so run through this once on a
+new machine. Use real keys in `backend/.env`.
+
+1. `docker compose config` should print the merged file with no error.
+2. `docker compose build`, then `docker compose up -d redis api worker`.
+3. `docker compose ps`: `redis` should be `healthy`, `api` and `worker` `running`.
+4. `docker compose exec redis redis-cli ping` should print `PONG`.
+5. `docker compose logs worker` should show `celery@... ready` and, under
+   `[tasks]`, `documents.process`. It should also show `concurrency: 3`.
+6. In the app, upload five or more documents to a case. In
+   `docker compose logs -f worker`, expect lines like
+   `Task documents.process[...] received` and then `succeeded`, with up to
+   three running at once. The Documents list should move each file from
+   `uploaded` to `processing` to `llm_done` without a page refresh.
+7. **Outage test:** `docker compose stop redis`, then upload one document. It
+   must not stay in `processing` forever: the upload response carries a warning,
+   the upload panel shows an amber banner, the API log has an error line
+   starting `documents.QUEUE_UNAVAILABLE_FALLING_BACK_IN_PROCESS`, and the
+   document is processed inside the API container instead.
+   Then `docker compose start redis` and confirm the next upload is queued again.
+
+If the API log shows `QUEUE_UNAVAILABLE_*` in production, Redis or the worker is
+down and the API process is doing the processing itself. Treat it as an alert.
 
 ## Troubleshooting
 

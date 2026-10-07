@@ -49,6 +49,8 @@ To run the API, Redis, and workers with Docker, see [SETUP.md](./SETUP.md).
 
 On local development without Redis, leave `CELERY_ENABLED=false` and the API retains its prior in-process background processing. Enable it only when a reachable broker and at least one Celery worker are running.
 
+**One batch path per upload.** `PipelineService.execute_batch` (bounded-concurrency, in-process) and the Celery task `documents.process` both call the same `execute_analysis_pipeline` per document. `app/services/document_dispatch.py` picks exactly one of them for each upload from `CELERY_ENABLED`, so there are never two competing paths for the same document. If the queue is enabled but unreachable, the dispatcher falls back to `execute_batch`, logs a `QUEUE_UNAVAILABLE_*` error, and returns a warning that the upload panel displays. See D9 in [DECISIONS.md](./DECISIONS.md).
+
 ## Planned delta (Phase 1–2, see ROADMAP.md)
 
 ```mermaid

@@ -66,6 +66,22 @@
 
 **Why this wasn't caught by the original Phase 1 review:** the three sites above predate this round's changes (or were touched incidentally by D3's `source` tagging) and weren't part of the planned Phase 1 file list — they surfaced from a direct question about the blast radius of adding an unmigrated column to existing insert calls, not from the original audit.
 
+## D9 — Optional Celery/Redis document queue, off by default
+
+**Decision:** Add Celery with Redis as an *optional* way to run the document pipeline (`CELERY_ENABLED`, default `false`; the Docker Compose stack turns it on). With it off, nothing changes: uploads run through the existing in-process `PipelineService.execute_batch`, and the API and test suite start without celery being importable.
+
+**Why:** The in-process path already runs three documents at once (each with four concurrent pages), so the queue is not about basic parallelism. It adds durability (queued work survives an API restart or deploy), horizontal scaling by adding workers, and keeping long OCR/VLM work out of the API process. That is worth having for a hosted deployment, but it is a new service to run, so it is opt-in.
+
+**How it relates to `execute_batch`:** both call the same `execute_analysis_pipeline` per document. `app/services/document_dispatch.py` chooses exactly one per upload (and per `/documents/{id}/process`), so there are never two competing batch paths. A worker's `CELERY_WORKER_CONCURRENCY` (default 3, hard-capped at 6) replaces `execute_batch`'s semaphore.
+
+**Failure behaviour (decided by the team lead):** if the broker is unreachable (or celery is not installed) when enqueuing, the documents fall back to the in-process path rather than failing, with an error-level `QUEUE_UNAVAILABLE_*` log on every occurrence and a `processing_mode`/`warning` in the API response that the upload panel shows. Only if not even the fallback is possible is the document marked `flagged` (and `/process` returns 503). A document is never left in `processing` with nothing working on it.
+
+**Rate limits:** Gemini calls already retry three times inside the SDK. If a document still fails because Gemini rate-limited it (429/`RESOURCE_EXHAUSTED`), the pipeline's failure result carries an additive `rate_limited` flag and the task retries with exponential backoff and jitter (30 s base, up to 5 retries). Other unexpected errors retry twice. The flag only labels failures: extraction output on success, in-process failure handling, and the `has_handwritten_content` missing-means-`True` default are unchanged (tests in `test_rate_limit.py`).
+
+**Known limits, deliberately left alone:** a single *page* that Gemini rate-limits still degrades inside the router as before (changing that would change extraction output); only document-level structured-extraction rate limits are retried. A retry after a crash that happened after the `extractions` row was written is skipped by the existing `already_processed` guard, so that document stays half-processed until it is reprocessed. The fallback state is shown in the upload response and panel, not stored per document, because that would need a new column.
+
+**Why not the alternatives:** a bigger in-process semaphore gives none of the durability; a hosted queue service (SQS, Cloud Tasks) would tie us to one cloud before that decision is made. Celery on Redis runs identically on a laptop and in Docker.
+
 ## Outstanding verification (not yet done)
 
 - ~~Migration `backend/migrations/0006_risk_flags_source.sql` has not been applied~~ — **confirmed applied to the live Supabase project.**

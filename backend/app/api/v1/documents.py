@@ -3,6 +3,7 @@ from app.schemas.documents import BatchUploadResponse, DocumentResponse, Documen
 from app.schemas.document_pages import DocumentPageResponse, DocumentPagesResponse, EnhancedPageImageResponse, UpdatePageTextRequest
 from app.services.doc_service import DocumentService, STORAGE_BUCKET, enhanced_page_image_path
 from app.services.pipeline_service import PipelineService
+from app.services.document_dispatch import dispatch_documents
 from app.repositories.doc_repo import DocumentRepository
 from app.repositories.case_repo import CaseRepository
 from app.repositories.flag_repo import FlagRepository
@@ -10,7 +11,6 @@ from app.repositories.document_page_repo import DocumentPageRepository
 from app.services.translation_service import translate_pages
 from app.services.embedding_service import embed_text
 from app.core.logging import logger
-from app.core.config import settings
 from app.dependencies.db import get_supabase_client
 from app.dependencies.auth import RoleRequirement
 from app.core.exceptions import PropertySystemException, ResourceNotFoundError
@@ -82,37 +82,17 @@ async def upload_documents(
             # keep processing the rest of the batch instead of failing the request.
             results.append(DocumentUploadResult(file_name=file.filename, success=False, error=e.message))
 
-    if settings.CELERY_ENABLED:
-        # Imported lazily: Celery is only needed when the queue is enabled, so
-        # the API (and the test suite) start without it being importable.
-        from app.tasks.document_tasks import process_document_task
+    outcome = dispatch_documents(uploaded_doc_ids, pipeline_service, background_tasks)
+    for result in results:
+        if result.document and str(result.document.id) in outcome.failed_ids:
+            result.error = (
+                "Upload succeeded, but processing could not be started. "
+                "Check Redis/Celery availability and retry processing."
+            )
 
-        for document_id in uploaded_doc_ids:
-            try:
-                process_document_task.delay(document_id)
-            except Exception:
-                logger.exception(
-                    "documents.task_enqueue_failed | document_id=%s",
-                    document_id,
-                )
-                try:
-                    pipeline_service.doc_repo.update_status(document_id, "flagged")
-                except Exception:
-                    logger.exception(
-                        "documents.task_enqueue_failure_status_update_failed | document_id=%s",
-                        document_id,
-                    )
-                for result in results:
-                    if result.document and str(result.document.id) == document_id:
-                        result.error = (
-                            "Upload succeeded, but processing could not be queued. "
-                            "Check Redis/Celery availability and retry processing."
-                        )
-                        break
-    elif uploaded_doc_ids and background_tasks is not None:
-        background_tasks.add_task(pipeline_service.execute_batch, uploaded_doc_ids)
-
-    return BatchUploadResponse(results=results)
+    return BatchUploadResponse(
+        results=results, processing_mode=outcome.mode, warning=outcome.warning
+    )
 
 @router.get("/{id}", response_model=DocumentResponse)
 def get_document(
@@ -289,10 +269,14 @@ def process_document(
     current_user: Dict[str, Any] = Depends(RoleRequirement(["Reviewer", "Admin"])),
     pipeline_service: PipelineService = Depends(get_pipeline_service)
 ):
-    if settings.CELERY_ENABLED:
-        from app.tasks.document_tasks import process_document_task
-
-        process_document_task.delay(id)
-    else:
-        background_tasks.add_task(pipeline_service.execute_analysis_pipeline, id)
-    return {"message": f"Processing pipeline queued for document {id}"}
+    outcome = dispatch_documents([id], pipeline_service, background_tasks)
+    if outcome.failed_ids:
+        raise PropertySystemException(
+            outcome.warning or "Processing could not be started.",
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        )
+    return {
+        "message": f"Processing pipeline queued for document {id}",
+        "processing_mode": outcome.mode,
+        "warning": outcome.warning,
+    }

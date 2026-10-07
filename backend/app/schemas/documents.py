@@ -39,3 +39,7 @@ class DocumentUploadResult(BaseModel):
 
 class BatchUploadResponse(BaseModel):
     results: List[DocumentUploadResult]
+    # "in_process" | "queued" | "in_process_fallback" | "failed" — see
+    # app/services/document_dispatch.py. A fallback or failure also sets `warning`.
+    processing_mode: str = "in_process"
+    warning: Optional[str] = None

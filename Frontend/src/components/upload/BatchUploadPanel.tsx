@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowRight, UploadCloud, FileText, X, Loader2, Ban } from "lucide-react";
+import { AlertTriangle, ArrowRight, UploadCloud, FileText, X, Loader2, Ban } from "lucide-react";
 import { apiClient } from "@/services/api/client";
 import { useToast } from "@/context/ToastContext";
 import { Button } from "@/components/ui/button";
@@ -33,6 +33,7 @@ export function BatchUploadPanel({ caseId, onUploaded }: BatchUploadPanelProps) 
   const [uploadProgress, setUploadProgress] = useState(0);
   const [tracked, setTracked] = useState<TrackedDocument[]>([]);
   const [hasUploadedDocuments, setHasUploadedDocuments] = useState(false);
+  const [queueWarning, setQueueWarning] = useState<string | null>(null);
 
   const abortControllerRef = useRef<AbortController | null>(null);
   const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -163,6 +164,10 @@ export function BatchUploadPanel({ caseId, onUploaded }: BatchUploadPanelProps) 
     if (failed > 0) {
       toast.error(`${failed} file${failed === 1 ? "" : "s"} failed to upload`, "Some Files Failed");
     }
+    setQueueWarning(result.data.warning ?? null);
+    if (result.data.warning) {
+      toast.warning(result.data.warning, "Processing Queue Unavailable");
+    }
     for (const fileResult of result.data.results) {
       if (fileResult.error) {
         toast.error(`${fileResult.file_name}: ${fileResult.error}`, "Processing Queue Error");
@@ -282,6 +287,13 @@ export function BatchUploadPanel({ caseId, onUploaded }: BatchUploadPanelProps) 
           )}
         </Button>
       </div>
+
+      {queueWarning && (
+        <p className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
+          <AlertTriangle size={14} className="mt-0.5 shrink-0" />
+          {queueWarning}
+        </p>
+      )}
 
       {hasUploadedDocuments && tracked.length > 0 && tracked.every((t) => TERMINAL_STATUSES.includes(t.status)) && (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4">

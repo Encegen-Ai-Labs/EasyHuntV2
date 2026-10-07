@@ -52,6 +52,10 @@ export interface DocumentUploadResult {
 
 export interface BatchUploadResponse {
   results: DocumentUploadResult[];
+  /** "in_process" | "queued" | "in_process_fallback" | "failed" */
+  processing_mode?: string;
+  /** Set when the document queue was unavailable (fallback or failure). */
+  warning?: string | null;
 }
 
 export interface DocumentPageRecord {

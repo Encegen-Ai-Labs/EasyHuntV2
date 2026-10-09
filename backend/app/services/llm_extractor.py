@@ -11,6 +11,10 @@ load_dotenv()
 
 client_genai = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
+# The one place the extraction model is named. The extraction cache key
+# includes it, so a model change must happen here and nowhere else.
+GEMINI_MODEL = "gemini-3.5-flash-lite"
+
 # Per-request timeout for structured-field-extraction/whole-document Gemini
 # calls, in milliseconds — see page_extraction_service.GEMINI_PAGE_TIMEOUT_MS
 # for why an explicit timeout matters (no timeout means an indefinite hang on
@@ -161,7 +165,7 @@ def extract_structured_fields_from_text(text: str) -> Dict[str, Any]:
     raw_output = None
     try:
         response = client_genai.models.generate_content(
-            model="gemini-3.5-flash-lite",
+            model=GEMINI_MODEL,
             contents=[STRUCTURED_EXTRACTION_FROM_TEXT_PROMPT, text],
             config=types.GenerateContentConfig(
                 temperature=0.0,
@@ -178,7 +182,7 @@ def extract_structured_fields_from_text(text: str) -> Dict[str, Any]:
             "success": True,
             "raw_output": raw_output,
             "extracted": extracted,
-            "model_used": "gemini-3.5-flash-lite",
+            "model_used": GEMINI_MODEL,
             "error": None,
         }
     except json.JSONDecodeError:
@@ -186,7 +190,7 @@ def extract_structured_fields_from_text(text: str) -> Dict[str, Any]:
             "success": False,
             "raw_output": raw_output,
             "extracted": None,
-            "model_used": "gemini-3.5-flash-lite",
+            "model_used": GEMINI_MODEL,
             "error": "Model returned invalid JSON",
         }
     except Exception as e:
@@ -194,7 +198,7 @@ def extract_structured_fields_from_text(text: str) -> Dict[str, Any]:
             "success": False,
             "raw_output": None,
             "extracted": None,
-            "model_used": "gemini-3.5-flash-lite",
+            "model_used": GEMINI_MODEL,
             "error": str(e),
             "rate_limited": is_rate_limit_error(e),
         }
@@ -244,7 +248,7 @@ def extract_from_image_path(image_path: str, mime_type: str | None = None) -> Di
         mime_type = mime_type or _get_mime_type(image_path)
 
         response = client_genai.models.generate_content(
-            model="gemini-3.5-flash-lite",
+            model=GEMINI_MODEL,
             contents=[
                 types.Part.from_bytes(
                     data=file_bytes,
@@ -269,7 +273,7 @@ def extract_from_image_path(image_path: str, mime_type: str | None = None) -> Di
             "success": True,
             "raw_output": raw_output,
             "extracted": extracted,
-            "model_used": "gemini-3.5-flash-lite",
+            "model_used": GEMINI_MODEL,
             "error": None
         }
 
@@ -278,7 +282,7 @@ def extract_from_image_path(image_path: str, mime_type: str | None = None) -> Di
             "success": False,
             "raw_output": raw_output,
             "extracted": None,
-            "model_used": "gemini-3.5-flash-lite",
+            "model_used": GEMINI_MODEL,
             "error": "Model returned invalid JSON"
         }
     except Exception as e:
@@ -286,7 +290,7 @@ def extract_from_image_path(image_path: str, mime_type: str | None = None) -> Di
             "success": False,
             "raw_output": None,
             "extracted": None,
-            "model_used": "gemini-3.5-flash-lite",
+            "model_used": GEMINI_MODEL,
             "error": str(e),
             "rate_limited": is_rate_limit_error(e),
         }
@@ -323,6 +327,6 @@ def extract_from_supabase_url(file_url: str, mime_type: str | None = None) -> Di
             "success": False,
             "raw_output": None,
             "extracted": None,
-            "model_used": "gemini-3.5-flash-lite",
+            "model_used": GEMINI_MODEL,
             "error": str(e)
         }

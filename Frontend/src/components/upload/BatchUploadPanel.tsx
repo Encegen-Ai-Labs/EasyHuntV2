@@ -34,6 +34,10 @@ export function BatchUploadPanel({ caseId, onUploaded }: BatchUploadPanelProps) 
   const [tracked, setTracked] = useState<TrackedDocument[]>([]);
   const [hasUploadedDocuments, setHasUploadedDocuments] = useState(false);
   const [queueWarning, setQueueWarning] = useState<string | null>(null);
+  // When the same file was extracted before, its saved result is reused. A
+  // lawyer who re-uploads because that read looked wrong ticks this to get a
+  // fresh extraction instead.
+  const [forceRefresh, setForceRefresh] = useState(false);
 
   const abortControllerRef = useRef<AbortController | null>(null);
   const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -132,9 +136,11 @@ export function BatchUploadPanel({ caseId, onUploaded }: BatchUploadPanelProps) 
     const result = await apiClient.documents.upload(caseId, queuedFiles, {
       signal: controller.signal,
       onProgress: setUploadProgress,
+      forceRefresh,
     });
 
     setIsUploading(false);
+    setForceRefresh(false);
     abortControllerRef.current = null;
 
     if (!result.success || !result.data) {
@@ -236,6 +242,22 @@ export function BatchUploadPanel({ caseId, onUploaded }: BatchUploadPanelProps) 
             </li>
           ))}
         </ul>
+      )}
+
+      {queuedFiles.length > 0 && (
+        <label className="flex items-start gap-2 text-xs text-muted-foreground">
+          <input
+            type="checkbox"
+            checked={forceRefresh}
+            onChange={(e) => setForceRefresh(e.target.checked)}
+            disabled={isUploading}
+            className="mt-0.5"
+          />
+          <span>
+            <span className="font-medium text-foreground">Ignore saved results</span> — if one of these files was
+            extracted before, read it again from scratch instead of reusing that result.
+          </span>
+        </label>
       )}
 
       {isUploading && (

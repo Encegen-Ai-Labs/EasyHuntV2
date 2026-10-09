@@ -304,11 +304,13 @@ export const apiClient = {
     upload: (
       caseId: string,
       files: File[],
-      options?: { signal?: AbortSignal; onProgress?: (percent: number) => void }
+      options?: { signal?: AbortSignal; onProgress?: (percent: number) => void; forceRefresh?: boolean }
     ): Promise<{ success: boolean; data?: BatchUploadResponse; error?: string }> => {
       return new Promise((resolve) => {
         const formData = new FormData();
         formData.append("case_id", caseId);
+        // Ignore any saved extraction for these exact files and read them afresh.
+        if (options?.forceRefresh) formData.append("force_refresh", "true");
         files.forEach((file) => formData.append("files", file));
 
         const xhr = new XMLHttpRequest();

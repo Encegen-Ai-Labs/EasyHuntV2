@@ -46,6 +46,7 @@ def list_documents(
 async def upload_documents(
     case_id: str = Form(...),
     files: List[UploadFile] = File(...),
+    force_refresh: bool = Form(False),
     background_tasks: BackgroundTasks = None,
     current_user: Dict[str, Any] = Depends(RoleRequirement(["Reviewer", "Admin"])),
     service: DocumentService = Depends(get_doc_service),
@@ -82,7 +83,10 @@ async def upload_documents(
             # keep processing the rest of the batch instead of failing the request.
             results.append(DocumentUploadResult(file_name=file.filename, success=False, error=e.message))
 
-    outcome = dispatch_documents(uploaded_doc_ids, pipeline_service, background_tasks)
+    if force_refresh:
+        outcome = dispatch_documents(uploaded_doc_ids, pipeline_service, background_tasks, force_refresh=True)
+    else:
+        outcome = dispatch_documents(uploaded_doc_ids, pipeline_service, background_tasks)
     for result in results:
         if result.document and str(result.document.id) in outcome.failed_ids:
             result.error = (

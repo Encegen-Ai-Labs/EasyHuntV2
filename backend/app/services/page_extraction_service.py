@@ -7,7 +7,7 @@ import fitz  # PyMuPDF
 from PIL import Image
 from google.genai import types
 
-from app.services.llm_extractor import client_genai, _clean_json_response
+from app.services.llm_extractor import GEMINI_MODEL, client_genai, _clean_json_response
 from app.services.rate_limit import is_rate_limit_error
 
 # 2026-08-21: replaced the older, narrower verbatim-only prompt with a more
@@ -119,7 +119,7 @@ def extract_page_text(image_bytes: bytes, mime_type: str = "image/png") -> Dict[
     failure can't corrupt another page's result."""
     try:
         response = client_genai.models.generate_content(
-            model="gemini-3.5-flash-lite",
+            model=GEMINI_MODEL,
             contents=[
                 types.Part.from_bytes(data=image_bytes, mime_type=mime_type),
                 PAGE_TRANSCRIPTION_PROMPT
@@ -216,7 +216,7 @@ def extract_page_text_and_fields(image_bytes: bytes, mime_type: str = "image/png
     """
     try:
         response = client_genai.models.generate_content(
-            model="gemini-3.5-flash-lite",
+            model=GEMINI_MODEL,
             contents=[
                 types.Part.from_bytes(data=image_bytes, mime_type=mime_type),
                 PAGE_TRANSCRIPTION_AND_EXTRACTION_PROMPT
@@ -233,7 +233,7 @@ def extract_page_text_and_fields(image_bytes: bytes, mime_type: str = "image/png
         if FIELDS_DELIMITER not in raw:
             return {
                 "success": False, "text": None, "extracted": None,
-                "model_used": "gemini-3.5-flash-lite",
+                "model_used": GEMINI_MODEL,
                 "error": f"Model response missing '{FIELDS_DELIMITER}' delimiter",
             }
         text_part, _, fields_part = raw.partition(FIELDS_DELIMITER)
@@ -242,18 +242,18 @@ def extract_page_text_and_fields(image_bytes: bytes, mime_type: str = "image/png
             "success": True,
             "text": text_part.strip(),
             "extracted": extracted,
-            "model_used": "gemini-3.5-flash-lite",
+            "model_used": GEMINI_MODEL,
             "error": None,
         }
     except json.JSONDecodeError:
         return {
             "success": False, "text": None, "extracted": None,
-            "model_used": "gemini-3.5-flash-lite",
+            "model_used": GEMINI_MODEL,
             "error": "Model returned invalid JSON in the fields block",
         }
     except Exception as e:
         return {
-            "success": False, "text": None, "extracted": None, "model_used": "gemini-3.5-flash-lite",
+            "success": False, "text": None, "extracted": None, "model_used": GEMINI_MODEL,
             "error": str(e), "rate_limited": is_rate_limit_error(e),
         }
 
@@ -327,6 +327,17 @@ def rasterize_pages(file_bytes: bytes, mime_type: str) -> List[bytes]:
         return pages
     finally:
         pdf.close()
+
+
+def download_file(file_url: str) -> bytes:
+    """Downloads the document bytes from its signed URL. Raises on failure.
+    Used when the extraction cache is on, because the cache key is the hash of
+    these exact bytes."""
+    import httpx
+    with httpx.Client() as client:
+        response = client.get(file_url)
+        response.raise_for_status()
+    return response.content
 
 
 def download_and_rasterize(file_url: str, mime_type: str) -> List[bytes]:

@@ -25,6 +25,9 @@ import { SelectableText } from "@/components/search/SelectableText";
 // alongside every field, e.g. "owner_name_confidence" — paired up with their
 // base field below rather than shown as their own row.
 const CONFIDENCE_SUFFIX = "_confidence";
+// Written into extractions.validation_errors by the backend when a stored
+// extraction of the same file was reused (backend/app/services/extraction_cache.py).
+const CACHED_RESULT_PREFIX = "cached_result:";
 // Rendered separately, not as a generic field row.
 const SPECIAL_KEYS = new Set([
   "full_text",
@@ -117,6 +120,9 @@ export function ReviewPage() {
   }
 
   const currentFields: Record<string, any> = editedFields ?? active?.extraction?.validated_json_output ?? {};
+  const cachedNote = (active?.extraction?.validation_errors ?? []).find(
+    (e): e is string => typeof e === "string" && e.startsWith(CACHED_RESULT_PREFIX)
+  );
 
   function handleFieldChange(key: string, value: string) {
     setEditedFields({ ...currentFields, [key]: value });
@@ -418,7 +424,13 @@ export function ReviewPage() {
                       {active.extraction.needs_review && (
                         <Badge variant="destructive">Needs human review</Badge>
                       )}
+                      {cachedNote && <Badge variant="outline">Saved result</Badge>}
                     </div>
+                    {cachedNote && (
+                      <p className="text-xs text-muted-foreground">
+                        {cachedNote.replace(CACHED_RESULT_PREFIX, "").trim()}
+                      </p>
+                    )}
 
                     <div className="flex flex-col gap-2">
                       {Object.entries(currentFields)

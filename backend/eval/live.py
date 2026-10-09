@@ -95,6 +95,7 @@ def extract_case(case, stage: str, deps: LiveDeps) -> Dict[str, Any]:
         extracted["_meta"] = {
             "stage": stage,
             "source": "vlm" if any(p["source"] == "vlm" for p in routed) else "ocr",
+            "page_sources": [p["source"] for p in routed],
         }
         return extracted
     except Exception as e:  # one bad document must not abort the run

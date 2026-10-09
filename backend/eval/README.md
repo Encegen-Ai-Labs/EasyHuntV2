@@ -87,3 +87,20 @@ the `n` next to every number.
 
 `eval_runs/<timestamp>/` (gitignored): `results.json`, `report.md` (with a
 per-document table of every mismatch), and `predictions/` for `--live`.
+
+## Variance test
+
+Does the same document give the same extraction every time?
+
+```
+python -m eval.variance --predictions <dir>        # offline, on run_1/, run_2/, ... recorded by eval.run --live --runs N
+python -m eval.variance --document <file> --n 10   # live: needs GEMINI_API_KEY, makes real Gemini calls
+```
+
+Per field: distinct answers (raw, and after ignoring case/punctuation/digit
+script), the most common answer and its share, and a verdict (`stable`,
+`cosmetic`, `unstable`). It also says whether the page transcription itself
+varied between runs or only the field extraction did, whether OCR/VLM routing
+changed, and (live) how many Gemini calls were made. The extraction cache is
+not involved: live mode calls the extraction steps directly.
+

@@ -29,6 +29,32 @@ class Settings(BaseSettings):
     ADMIN_EMAIL: str = Field(default="", validation_alias="ADMIN_EMAIL")
     ADMIN_PASSWORD: str = Field(default="", validation_alias="ADMIN_PASSWORD")
 
+    # Document processing can use the durable Celery queue when Redis is
+    # available. Local development keeps the existing FastAPI background-task
+    # path unless CELERY_ENABLED is explicitly enabled.
+    CELERY_ENABLED: bool = Field(default=False, validation_alias="CELERY_ENABLED")
+    CELERY_BROKER_URL: str = Field(
+        default="redis://localhost:6379/0",
+        validation_alias="CELERY_BROKER_URL",
+    )
+    # Documents processed at once per worker process. Each document fans out to
+    # up to MAX_CONCURRENT_PAGES_PER_DOCUMENT concurrent Gemini calls, so the
+    # worst case in flight is workers x this x 4. Hard-capped in celery_app.py.
+    CELERY_WORKER_CONCURRENCY: int = Field(default=3, validation_alias="CELERY_WORKER_CONCURRENCY")
+    # Backoff when Gemini rate-limits a document: base * 2^attempt seconds, plus jitter.
+    CELERY_RATE_LIMIT_RETRIES: int = Field(default=5, validation_alias="CELERY_RATE_LIMIT_RETRIES")
+    CELERY_RATE_LIMIT_BACKOFF_SECONDS: int = Field(
+        default=30, validation_alias="CELERY_RATE_LIMIT_BACKOFF_SECONDS"
+    )
+
+    # ---- Search ----
+    # Similar-meaning search returns the closest pages by embedding distance no
+    # matter how weak the match, so drop pages below this cosine similarity.
+    # Deliberately permissive until it can be calibrated on real case data
+    # (including Marathi/Hindi pages); the UI shows each match's similarity so a
+    # reviewer can judge weak ones. Raise it if the "Similar" section is noisy.
+    SEARCH_MIN_SIMILARITY: float = Field(default=0.30, validation_alias="SEARCH_MIN_SIMILARITY")
+
     # ---- Document router (OCR vs VLM routing, app/services/document_router.py) ----
     # Handwritten-area ratio at or above which a page is routed to the VLM instead
     # of the (faster, cheaper) OCR path. ratio = handwritten box area / total box area.

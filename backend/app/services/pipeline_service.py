@@ -134,8 +134,8 @@ class PipelineService:
         if enhance_report.get("fallback"):
             logger.info(
                 "pipeline.page_enhance_fallback | document_id=%s page=%s "
-                "reason=could_not_decode_or_process_image, used original bytes",
-                doc_id, page_number,
+                "reason=could_not_decode_or_process_image, used original bytes error=%s",
+                doc_id, page_number, enhance_report.get("error"),
             )
         else:
             applied = [
@@ -348,7 +348,10 @@ class PipelineService:
                 "status": "failed",
                 "case_id": case_id,
                 "document_id": doc_id,
-                "error": result["error"]
+                "error": result["error"],
+                # Lets the queue task retry later with backoff; ignored by the
+                # in-process path, which behaves exactly as before.
+                "rate_limited": bool(result.get("rate_limited")),
             }
 
         extracted = dict(result["extracted"])

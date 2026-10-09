@@ -5,7 +5,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   Activity,
-  AlertTriangle,
   CheckCircle2,
   FileSearch,
   MoreHorizontal,
@@ -91,9 +90,8 @@ export function DashboardPage() {
   const kpis = useMemo(() => {
     const total = dashboardCases.length;
     const pendingExtractions = dashboardCases.filter((c) => c.status === "Processing" || c.status === "Draft").length;
-    const criticalRiskFlags = dashboardCases.filter((c) => c.risk === "Critical").length;
     const completedReviews = dashboardCases.filter((c) => c.status === "Completed").length;
-    return { total, pendingExtractions, criticalRiskFlags, completedReviews };
+    return { total, pendingExtractions, completedReviews };
   }, [dashboardCases]);
 
   function handleExport() {
@@ -102,7 +100,7 @@ export function DashboardPage() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `propverify-cases-${new Date().toISOString().split("T")[0]}.csv`;
+    link.download = `easyhuntv2-cases-${new Date().toISOString().split("T")[0]}.csv`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -138,10 +136,9 @@ export function DashboardPage() {
         </section>
 
         {/* KPI cards */}
-        <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           <KpiCard title="Total Cases" value={String(kpis.total)} icon={<FileSearch size={18} />} />
           <KpiCard title="Pending Extractions" value={String(kpis.pendingExtractions)} icon={<Activity size={18} />} />
-          <KpiCard title="Critical Risk Flags" value={String(kpis.criticalRiskFlags)} icon={<AlertTriangle size={18} />} />
           <KpiCard title="Completed Reviews" value={String(kpis.completedReviews)} icon={<CheckCircle2 size={18} />} />
         </section>
 

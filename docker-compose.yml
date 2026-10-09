@@ -1,0 +1,46 @@
+services:
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  api:
+    build:
+      context: ./backend
+    env_file:
+      - ./backend/.env
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      CELERY_ENABLED: "true"
+      CELERY_BROKER_URL: redis://redis:6379/0
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  worker:
+    build:
+      context: ./backend
+    env_file:
+      - ./backend/.env
+    # Concurrency comes from CELERY_WORKER_CONCURRENCY (default 3, capped at 6
+    # in app/tasks/celery_app.py), not from a CLI flag, so the cap always applies.
+    command: celery -A app.tasks.celery_app:celery_app worker --loglevel=INFO
+    restart: unless-stopped
+    environment:
+      CELERY_ENABLED: "true"
+      CELERY_BROKER_URL: redis://redis:6379/0
+    depends_on:
+      redis:
+        condition: service_healthy
+
+volumes:
+  redis-data:

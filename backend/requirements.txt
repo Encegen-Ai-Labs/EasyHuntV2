@@ -16,3 +16,4 @@ opencv-python-headless>=4.9.0
 Pillow>=10.2.0
 numpy>=1.26.0
 pytesseract>=0.3.10
+celery[redis]>=5.4.0

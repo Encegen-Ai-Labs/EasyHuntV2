@@ -262,8 +262,8 @@ def enhance_page_image_with_report(png_bytes: bytes) -> Tuple[bytes, Dict[str, A
             report["sharpened"] = True
 
         return _encode_png(image), report
-    except Exception:
-        return png_bytes, {"fallback": True}
+    except Exception as exc:
+        return png_bytes, {"fallback": True, "error": str(exc)}
 
 
 def enhance_page_image(png_bytes: bytes) -> bytes:

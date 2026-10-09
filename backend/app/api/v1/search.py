@@ -34,9 +34,13 @@ def search_case_documents(
     exact mode: case-insensitive literal substring match across both
     original-language and English text.
 
-    semantic mode: embedding-based similarity search (see embedding_service.py
-    and migrations/0005_document_pages_embedding.sql) — finds conceptually
-    related text even with no shared substring. Falls back to exact mode if
-    embedding the query itself fails."""
-    results = service.search_case(case_id, q, current_user, mode=mode)
-    return SearchResponse(query=q, mode=mode, results=results)
+    semantic mode ("Similar" in the UI): the exact matches first, then
+    embedding-based similar-meaning pages (see embedding_service.py and
+    migrations/0005_document_pages_embedding.sql), each with a `similarity`
+    score and never repeating a page already listed as exact. If the similar
+    half can't run, the exact results are returned with
+    `similar_unavailable=true`."""
+    outcome = service.search_case_with_status(case_id, q, current_user, mode=mode)
+    return SearchResponse(
+        query=q, mode=mode, results=outcome.results, similar_unavailable=outcome.similar_unavailable
+    )

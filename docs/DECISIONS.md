@@ -42,6 +42,8 @@
 
 ## D5 — Semantic search: hide, don't remove
 
+**Superseded by D8 below** (the team lead decided to offer similar search). The original reasoning is kept for the record.
+
 **Decision:** Remove the "Similar meaning" toggle from `CaseSearchPanel.tsx` so only exact search is user-facing, matching the stated SOP-8 scope ("exact match first, no fuzzy or semantic matching yet"). Leave `search_service.py`'s semantic path, `document_pages.embedding`, and the `match_document_pages` RPC untouched and dormant.
 
 **Options considered:**
@@ -66,9 +68,44 @@
 
 **Why this wasn't caught by the original Phase 1 review:** the three sites above predate this round's changes (or were touched incidentally by D3's `source` tagging) and weren't part of the planned Phase 1 file list — they surfaced from a direct question about the blast radius of adding an unmigrated column to existing insert calls, not from the original audit.
 
+## D8 — Re-enable similar search, exact first (supersedes D5)
+
+**Decision (team lead):** Similar-meaning search is wanted, so D5's "hide semantic search" no longer applies. The "Similar" capability is back in the case-workspace search, as an explicit opt-in on top of exact search.
+
+**Reason:** the team lead decided the product should offer similar-meaning search, and the embedding/RPC path built earlier is already implemented and tested, so this is a UI and result-shaping change, not a rebuild. (The earlier intern branch cited a reviewer request as its reason; no such request is recorded, so this decision rests on the team lead's call alone.)
+
+**Behaviour:**
+- Exact mode stays the default and never calls the embedding API.
+- In the combined mode ("Exact + similar") exact matches are always listed first, in their own section. Similar-meaning pages follow in a separate, clearly labelled "Similar passages" section, ranked by similarity, each with a similarity bar and percentage. A page already shown as an exact match is not repeated. (`search_service.search_case_with_status`.)
+- If the similar half cannot run (query embedding fails, or the embedding column / `match_document_pages` RPC is missing), exact results are still returned with `similar_unavailable=true` and the UI says so; it never silently downgrades.
+- `SEARCH_MIN_SIMILARITY` (default **0.30**) drops very weak matches. It is deliberately permissive because it has not been calibrated on real Marathi/Hindi pages; the similarity shown on each result lets a reviewer judge borderline ones. Tighten it when real data shows the section is noisy.
+- Highlighting works in both modes (`Frontend/src/lib/highlight.ts`): the whole phrase when it occurs, otherwise each word. Marathi/Hindi words keep their combining marks and zero-width joiners, and text and query are NFC-normalized so encoding differences still match. A similar result with no literal word in common shades the whole passage instead of implying a particular word matched.
+
+**Embeddings:** `gemini-embedding-001`, 768 dimensions, `RETRIEVAL_DOCUMENT` for pages and `RETRIEVAL_QUERY` for the search text, cosine distance in pgvector (migration `0005_document_pages_embedding.sql`). Only each page's `original_text` is embedded. The model is documented as multilingual, but its quality on Marathi/Hindi OCR text, and on an English query against a Marathi page, has **not** been verified against real cases; OCR noise in Devanagari will also lower the scores. Treat similar results as leads to check, which is also how the UI presents them.
+
+**Not yet confirmed:** that migration 0005 is applied to the live Supabase project, and how many existing pages have an embedding (pages processed before the migration will not). A backfill, if needed, is deliberately not written until those counts are known.
+
+**Other notes:** the "Similar" toggle is labelled "Exact + similar" because that is what it returns. Superseding D5 means the ROADMAP Phase 4 row and its manual-verification note changed too.
+
+## D9 — Optional Celery/Redis document queue, off by default
+
+**Decision:** Add Celery with Redis as an *optional* way to run the document pipeline (`CELERY_ENABLED`, default `false`; the Docker Compose stack turns it on). With it off, nothing changes: uploads run through the existing in-process `PipelineService.execute_batch`, and the API and test suite start without celery being importable.
+
+**Why:** The in-process path already runs three documents at once (each with four concurrent pages), so the queue is not about basic parallelism. It adds durability (queued work survives an API restart or deploy), horizontal scaling by adding workers, and keeping long OCR/VLM work out of the API process. That is worth having for a hosted deployment, but it is a new service to run, so it is opt-in.
+
+**How it relates to `execute_batch`:** both call the same `execute_analysis_pipeline` per document. `app/services/document_dispatch.py` chooses exactly one per upload (and per `/documents/{id}/process`), so there are never two competing batch paths. A worker's `CELERY_WORKER_CONCURRENCY` (default 3, hard-capped at 6) replaces `execute_batch`'s semaphore.
+
+**Failure behaviour (decided by the team lead):** if the broker is unreachable (or celery is not installed) when enqueuing, the documents fall back to the in-process path rather than failing, with an error-level `QUEUE_UNAVAILABLE_*` log on every occurrence and a `processing_mode`/`warning` in the API response that the upload panel shows. Only if not even the fallback is possible is the document marked `flagged` (and `/process` returns 503). A document is never left in `processing` with nothing working on it.
+
+**Rate limits:** Gemini calls already retry three times inside the SDK. If a document still fails because Gemini rate-limited it (429/`RESOURCE_EXHAUSTED`), the pipeline's failure result carries an additive `rate_limited` flag and the task retries with exponential backoff and jitter (30 s base, up to 5 retries). Other unexpected errors retry twice. The flag only labels failures: extraction output on success, in-process failure handling, and the `has_handwritten_content` missing-means-`True` default are unchanged (tests in `test_rate_limit.py`).
+
+**Known limits, deliberately left alone:** a single *page* that Gemini rate-limits still degrades inside the router as before (changing that would change extraction output); only document-level structured-extraction rate limits are retried. A retry after a crash that happened after the `extractions` row was written is skipped by the existing `already_processed` guard, so that document stays half-processed until it is reprocessed. The fallback state is shown in the upload response and panel, not stored per document, because that would need a new column.
+
+**Why not the alternatives:** a bigger in-process semaphore gives none of the durability; a hosted queue service (SQS, Cloud Tasks) would tie us to one cloud before that decision is made. Celery on Redis runs identically on a laptop and in Docker.
+
 ## Outstanding verification (not yet done)
 
 - ~~Migration `backend/migrations/0006_risk_flags_source.sql` has not been applied~~ — **confirmed applied to the live Supabase project.**
 - **Phase 1's red-flag extraction (the `red_flags` field added to `EXTRACTION_PROMPT`/`STRUCTURED_EXTRACTION_FROM_TEXT_PROMPT`) has only been verified against fakes in `pytest` — not against a real document through the live Gemini API.** The taxonomy, the lawyer-framing paragraph, and the defensive parsing (`_iter_valid_red_flags`) are all unit-tested, but nobody has confirmed the model actually produces sensible, well-formed `red_flags` entries for a real dispute/encumbrance clause yet. Now that the migration is applied, verify by uploading a real test document (see the Phase 1 hand-verification steps) — **still outstanding**, deferred by the user ("will do it later").
-- **Hand verification of Phases 2–4 is also still outstanding.** All four phases have automated test coverage (164 passing) and clean frontend builds, but nobody has clicked through the actual running app yet — risk-flags rendering with real data (Phase 2), the deleted/fixed dead-code screens (Phase 3), and exact-only search behavior (Phase 4) are all unverified by hand. See each phase's "Manual verification" column in ROADMAP.md.
+- **Hand verification of Phases 2–4 is also still outstanding.** All four phases have automated test coverage (164 passing) and clean frontend builds, but nobody has clicked through the actual running app yet — risk-flags rendering with real data (Phase 2), the deleted/fixed dead-code screens (Phase 3), and exact + similar search with Marathi/Hindi highlighting (Phase 4) are all unverified by hand. See each phase's "Manual verification" column in ROADMAP.md.
 - ~~Open, not yet decided: unrecognized/malformed `red_flags[].severity` default~~ — **decided**: defaults to `"high"`, not `"medium"` (`pipeline_service.py::_iter_valid_red_flags`). Same fail-toward-more-scrutiny reasoning as `has_handwritten_content`'s fail-safe `True` default — a lawyer glancing at one extra high-severity flag costs less than a genuinely serious one being buried. Also decided: the `red_flags` taxonomy stays three levels (`high`/`medium`/`low`), no `"critical"` tier — `_VALID_RED_FLAG_SEVERITIES` in `pipeline_service.py` already only recognized these three, so no code change was needed there beyond the default. Note this is scoped to LLM red flags only: `app/schemas/flags.py::FlagSeverityEnum` (used by the pre-existing manual flag-raising endpoint, `POST /flags/{case_id}`) still allows `"critical"` — that's a separate, out-of-scope feature, not touched.

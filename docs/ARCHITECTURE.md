@@ -8,6 +8,7 @@ This describes the system **as it exists today**, confirmed by [AUDIT.md](./AUDI
 - **Backend** — FastAPI app (`backend/app`), no ORM — thin repository classes over `supabase-py`'s `.table()`/`.rpc()` client (`app/repositories/*.py`).
 - **Supabase** — Postgres (schema defined in the hosted dashboard, not in-repo — see AUDIT.md) + Storage bucket `documents` for original and enhanced page images + pgvector extension for search embeddings.
 - **OCR** — Tesseract, local, `eng+hin+mar+tam+tel+kan` (`app/ocr/tesseract_provider.py`).
+- **Document queue** — Celery workers with Redis as broker. Docker Compose enables this; ordinary local API development keeps the existing FastAPI background-task path unless `CELERY_ENABLED=true`.
 - **VLM/LLM** — Google Gemini (`google.genai`), used for (a) low-confidence/handwritten page transcription, (b) structured field extraction from transcribed text, (c) search-query/page embeddings (`gemini-embedding-001`).
 - **Translation** — Google Cloud Translation v2, a separate API key from Gemini's, so translation cost is decoupled from the paid extraction model.
 
@@ -17,8 +18,10 @@ This describes the system **as it exists today**, confirmed by [AUDIT.md](./AUDI
 flowchart TD
     A[Lawyer creates case] --> B[Batch upload up to 20 files]
     B --> C[Storage: cases/case_id/file_name]
-    B --> D[Background pipeline per document]
-    D --> E[Rasterize to per-page PNGs<br/>PyMuPDF, 200 DPI]
+    B --> D[Enqueue one task per document]
+    D --> BROKER[(Redis)]
+    BROKER --> W[Celery workers<br/>configurable concurrency]
+    W --> E[Rasterize to per-page PNGs<br/>PyMuPDF, 200 DPI]
     E --> F[Image enhancement<br/>quality-gated deskew / denoise / CLAHE / sharpen]
     F --> G{Route per page}
     G -->|typed/printed, high OCR confidence| H[Tesseract OCR]
@@ -37,6 +40,16 @@ flowchart TD
     R --> T[Case search<br/>exact ILIKE + semantic pgvector]
     T --> U[Search results: doc + page,<br/>highlighted, editable]
 ```
+
+### Parallel document processing
+
+The upload endpoint stores every accepted file and document row first, then publishes one `documents.process` Celery task per document. Redis holds the queue; workers load the document from Supabase and run the existing pipeline. The browser reads status from the `documents` table, so no task-result polling or in-process API memory is required. Tasks use late acknowledgement, retry unexpected worker failures twice, and mark a document `flagged` after the final failure. Expected pipeline failures also set `flagged`.
+
+To run the API, Redis, and workers with Docker, see [SETUP.md](./SETUP.md).
+
+On local development without Redis, leave `CELERY_ENABLED=false` and the API retains its prior in-process background processing. Enable it only when a reachable broker and at least one Celery worker are running.
+
+**One batch path per upload.** `PipelineService.execute_batch` (bounded-concurrency, in-process) and the Celery task `documents.process` both call the same `execute_analysis_pipeline` per document. `app/services/document_dispatch.py` picks exactly one of them for each upload from `CELERY_ENABLED`, so there are never two competing paths for the same document. If the queue is enabled but unreachable, the dispatcher falls back to `execute_batch`, logs a `QUEUE_UNAVAILABLE_*` error, and returns a warning that the upload panel displays. See D9 in [DECISIONS.md](./DECISIONS.md).
 
 ## Planned delta (Phase 1–2, see ROADMAP.md)
 

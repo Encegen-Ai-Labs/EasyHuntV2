@@ -1,6 +1,9 @@
 import re
-from typing import Any, Dict, List
+from dataclasses import dataclass, field
+from typing import Any, Dict, List, Set, Tuple
 
+from app.core.config import settings
+from app.core.logging import logger
 from app.repositories.doc_repo import DocumentRepository
 from app.repositories.document_page_repo import DocumentPageRepository
 from app.services.doc_service import DocumentService
@@ -108,20 +111,34 @@ class SearchService:
     def search_case(
         self, case_id: str, query: str, current_user: Dict[str, Any], mode: str = "exact"
     ) -> List[Dict[str, Any]]:
+        return self.search_case_with_status(case_id, query, current_user, mode).results
+
+    def search_case_with_status(
+        self, case_id: str, query: str, current_user: Dict[str, Any], mode: str = "exact"
+    ) -> "SearchOutcome":
+        """Exact matches always come first. In "semantic" mode, similar-meaning
+        pages follow them (pages already listed as exact matches are not
+        repeated), each with a similarity score; the caller shows them as a
+        separate, labelled section. If the similar half can't run, the exact
+        results are still returned with similar_unavailable=True."""
         # Reuses the same case-ownership rule as upload/case-detail (creator or
         # assigned reviewer, admin unrestricted) instead of a third copy of it.
         self.doc_service.authorize_case_access(case_id, current_user)
 
         if not query or not query.strip():
-            return []
+            return SearchOutcome(results=[])
 
         docs = self.doc_repo.list_by_case(case_id)
         doc_lookup = {doc["id"]: doc for doc in docs}
         doc_ids = list(doc_lookup.keys())
 
-        if mode == "semantic":
-            return self._search_semantic(doc_ids, doc_lookup, query)
-        return self._search_exact(doc_ids, doc_lookup, query)
+        exact = self._search_exact(doc_ids, doc_lookup, query)
+        if mode != "semantic":
+            return SearchOutcome(results=exact)
+
+        already_listed = {(str(r["document_id"]), r["page_number"]) for r in exact}
+        similar, unavailable = self._search_similar(doc_ids, doc_lookup, query, already_listed)
+        return SearchOutcome(results=exact + similar, similar_unavailable=unavailable)
 
     def _search_exact(
         self, doc_ids: List[str], doc_lookup: Dict[str, Dict[str, Any]], query: str
@@ -143,30 +160,53 @@ class SearchService:
 
         return results
 
-    def _search_semantic(
-        self, doc_ids: List[str], doc_lookup: Dict[str, Dict[str, Any]], query: str
-    ) -> List[Dict[str, Any]]:
+    def _search_similar(
+        self,
+        doc_ids: List[str],
+        doc_lookup: Dict[str, Dict[str, Any]],
+        query: str,
+        already_listed: Set[Tuple[str, int]],
+    ) -> Tuple[List[Dict[str, Any]], bool]:
         query_embedding = embed_query(query)
         if query_embedding is None:
-            # Embedding the query failed (API hiccup, etc.) — fall back to
-            # exact match rather than surfacing an error for what the
-            # reviewer experiences as "search isn't working".
-            return self._search_exact(doc_ids, doc_lookup, query)
+            # Embedding the query failed (API hiccup, etc.). Say so instead of
+            # silently pretending there were no similar passages.
+            return [], True
 
-        pages = self.doc_page_repo.search_by_case_semantic(doc_ids, query_embedding)
+        try:
+            pages = self.doc_page_repo.search_by_case_semantic(doc_ids, query_embedding)
+        except Exception:
+            # e.g. migration 0005 (embedding column / match_document_pages) not
+            # applied to this project: keep exact results working.
+            logger.exception("search.similar_query_failed | doc_count=%s", len(doc_ids))
+            return [], True
+
+        min_similarity = settings.SEARCH_MIN_SIMILARITY
+        ranked = sorted(
+            (p for p in pages if (p.get("similarity") or 0.0) >= min_similarity),
+            key=lambda p: p.get("similarity") or 0.0,
+            reverse=True,
+        )
 
         results: List[Dict[str, Any]] = []
-        for page in pages:
+        for page in ranked:
+            if (str(page["document_id"]), page["page_number"]) in already_listed:
+                continue
             doc = doc_lookup.get(page["document_id"])
             text = page.get("original_text") or ""
-            snippet = build_semantic_snippet(text, query)
             results.append({
                 "document_id": page["document_id"],
                 "document_name": doc.get("file_name") if doc else None,
                 "page_number": page["page_number"],
                 "matched_in": "semantic",
-                "snippet": snippet,
+                "snippet": build_semantic_snippet(text, query),
                 "similarity": page.get("similarity"),
             })
 
-        return results
+        return results, False
+
+
+@dataclass
+class SearchOutcome:
+    results: List[Dict[str, Any]] = field(default_factory=list)
+    similar_unavailable: bool = False

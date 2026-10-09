@@ -16,3 +16,7 @@ class SearchResponse(BaseModel):
     query: str
     mode: str = "exact"
     results: List[SearchResult]
+    # Semantic mode only: True when the similar-meaning part could not run
+    # (query embedding failed, or the embedding column/RPC isn't available).
+    # `results` then holds the exact matches alone.
+    similar_unavailable: bool = False

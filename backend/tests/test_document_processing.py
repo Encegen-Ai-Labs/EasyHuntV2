@@ -115,7 +115,7 @@ class FakeExtractionRepo:
         }
         self.updated = []
 
-    def select_one(self, table, filters):
+    def select_one(self, table, filters, order_by=None):
         return self.extraction if filters.get("document_id") == self.extraction["document_id"] else None
 
     def update(self, table, filters, payload):

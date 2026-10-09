@@ -7,16 +7,23 @@ class BaseRepository:
         # Allow client injection, fallback to global settings
         self.client: Client = supabase_client or create_client(settings.SUPABASE_URL, get_supabase_key())
 
-    def select(self, table: str, query_filters: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
+    def select(self, table: str, query_filters: Optional[Dict[str, Any]] = None,
+               order_by: Optional[str] = None) -> List[Dict[str, Any]]:
         builder = self.client.table(table).select("*")
         if query_filters:
             for key, val in query_filters.items():
                 builder = builder.eq(key, val)
+        if order_by:
+            builder = builder.order(order_by)
         response = builder.execute()
         return response.data
 
-    def select_one(self, table: str, query_filters: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-        results = self.select(table, query_filters)
+    def select_one(self, table: str, query_filters: Dict[str, Any],
+                   order_by: Optional[str] = None) -> Optional[Dict[str, Any]]:
+        """order_by makes "the first row" deterministic when more than one
+        row can match; without it Postgres may return a different one after
+        an UPDATE rewrites the row."""
+        results = self.select(table, query_filters, order_by)
         return results[0] if results else None
 
     def insert(self, table: str, data: Dict[str, Any]) -> Dict[str, Any]:

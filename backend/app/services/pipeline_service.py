@@ -441,6 +441,22 @@ class PipelineService:
         try:
             self.generic_repo.insert("extractions", extraction_payload)
         except Exception as e:
+            # If a concurrent run for this same document already stored its
+            # extraction (possible when extractions.document_id is unique,
+            # migrations/0009), this one lost the race: that is not a
+            # failure, and must not flag a document that is fine.
+            try:
+                already = self.generic_repo.select("extractions", {"document_id": doc_id})
+            except Exception:
+                already = []
+            if already:
+                logger.info("pipeline.extraction_insert_lost_race | document_id=%s", doc_id)
+                return {
+                    "status": "already_processed",
+                    "case_id": case_id,
+                    "document_id": doc_id,
+                    "extracted": already[0]["validated_json_output"],
+                }
             # Unlike the document_pages/ownership_chain/flag inserts below
             # (all secondary — the pipeline is still useful without them),
             # the extractions row IS the primary record this method exists

@@ -104,3 +104,21 @@ varied between runs or only the field extraction did, whether OCR/VLM routing
 changed, and (live) how many Gemini calls were made. The extraction cache is
 not involved: live mode calls the extraction steps directly.
 
+## Growing the set from lawyer reviews
+
+Every review save is recorded in `extraction_corrections` (append-only; see
+`backend/migrations/0008_extraction_corrections.sql`). Approved documents can
+be exported into this folder format, on your machine with your own
+credentials:
+
+```
+python -m eval.export_corrections --all-approved --dry-run
+python -m eval.export_corrections --document-id <uuid> [--split holdout|example]
+```
+
+Only fields a human touched (edited, cleared, or confirmed by approving) are
+labelled; everything else goes under `unlabelled`, so an unreviewed model
+guess is never taken for a correct answer. New cases default to `holdout`;
+`handwriting` is a placeholder (`partial`/`none`) to correct by hand. Existing
+case folders are never overwritten.
+

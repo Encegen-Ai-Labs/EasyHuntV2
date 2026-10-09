@@ -124,8 +124,21 @@ export function ReviewPage() {
     (e): e is string => typeof e === "string" && e.startsWith(CACHED_RESULT_PREFIX)
   );
 
+  // Optional "why was this changed" per edited field; saved with the correction.
+  const [fieldReasons, setFieldReasons] = useState<Record<string, string>>({});
+
   function handleFieldChange(key: string, value: string) {
     setEditedFields({ ...currentFields, [key]: value });
+  }
+
+  // Only fields whose text actually differs from what is saved can have a reason.
+  function reasonsForSave(): Record<string, string> | undefined {
+    const saved = active?.extraction?.validated_json_output ?? {};
+    const out: Record<string, string> = {};
+    for (const [key, reason] of Object.entries(fieldReasons)) {
+      if (reason && String(currentFields[key] ?? "") !== String(saved[key] ?? "")) out[key] = reason;
+    }
+    return Object.keys(out).length ? out : undefined;
   }
 
   const { data: pagesData, isLoading: pagesLoading } = useDocumentPages(active?.document.id ?? "");
@@ -221,11 +234,13 @@ export function ReviewPage() {
         validated_output: currentFields,
         review_notes: reviewNotes.trim() || undefined,
         decision,
+        reasons: reasonsForSave(),
       },
     });
     if (result.success) {
       toast.success(decision === "approved" ? "Document approved." : "Document flagged for correction.", "Review Saved");
       setReviewNotes("");
+      setFieldReasons({});
       setIsEditingFields(false);
       setEditedFields(null);
 
@@ -255,9 +270,10 @@ export function ReviewPage() {
     const result = await submitReview.mutateAsync({
       documentId: active.document.id,
       caseId,
-      payload: { validated_output: currentFields },
+      payload: { validated_output: currentFields, reasons: reasonsForSave() },
     });
     if (result.success) {
+      setFieldReasons({});
       toast.success("Field edits saved.", "Saved");
       setIsEditingFields(false);
       setEditedFields(null);
@@ -449,11 +465,28 @@ export function ReviewPage() {
                                 )}
                               </div>
                               {isEditingFields ? (
+                                <>
                                 <input
                                   value={displayValue}
                                   onChange={(e) => handleFieldChange(key, e.target.value)}
                                   className="mt-1.5 h-8 w-full rounded-md border border-input bg-transparent px-2 text-sm outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30"
                                 />
+                                {String(value ?? "") !== String(active?.extraction?.validated_json_output?.[key] ?? "") && (
+                                  <select
+                                    aria-label={`Why was ${titleCase(key)} changed?`}
+                                    value={fieldReasons[key] ?? ""}
+                                    onChange={(e) => setFieldReasons({ ...fieldReasons, [key]: e.target.value })}
+                                    className="mt-1.5 h-7 w-full rounded-md border border-input bg-transparent px-1.5 text-xs text-muted-foreground"
+                                  >
+                                    <option value="">Why changed? (optional)</option>
+                                    <option value="misread">Misread the document</option>
+                                    <option value="wrong_field">Right value, wrong field</option>
+                                    <option value="hallucinated">Not in the document</option>
+                                    <option value="format">Formatting</option>
+                                    <option value="other">Other</option>
+                                  </select>
+                                )}
+                                </>
                               ) : (
                                 <p className="mt-1.5 text-sm">{displayValue || "—"}</p>
                               )}

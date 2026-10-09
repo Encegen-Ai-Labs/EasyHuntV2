@@ -591,7 +591,7 @@ export const apiClient = {
       documentId: string,
       // decision omitted (undefined) saves the reviewer's field edits without
       // finalizing approve/reject — see backend/app/services/review_service.py.
-      payload: { validated_output: Record<string, any>; review_notes?: string; decision?: "approved" | "rejected" }
+      payload: { validated_output: Record<string, any>; review_notes?: string; decision?: "approved" | "rejected"; reasons?: Record<string, string> }
     ): Promise<{ success: boolean; data?: any; error?: string }> => {
       try {
         const res = await fetch(`${API_BASE_URL}/review/documents/${documentId}`, {

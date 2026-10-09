@@ -54,9 +54,27 @@ export function useSubmitDocumentReviewMutation() {
     }: {
       documentId: string;
       caseId: string;
-      payload: { validated_output: Record<string, any>; review_notes?: string; decision?: "approved" | "rejected" };
+      payload: { validated_output: Record<string, any>; review_notes?: string; decision?: "approved" | "rejected"; reasons?: Record<string, string> };
     }) => apiClient.review.submitDocumentReview(documentId, payload),
-    onSuccess: (_data, variables) => {
+    onSuccess: (result, variables) => {
+      // Put the saved extraction into the cached list right away. Without
+      // this the page shows the pre-edit values until the refetch below
+      // finishes (it signs a URL for every document in the case, so that
+      // takes a moment), which looks like the save was lost.
+      const saved = result?.success ? result.data?.extraction : null;
+      if (saved) {
+        queryClient.setQueryData(["review", variables.caseId, "documents"], (old: any) => {
+          if (!old?.data) return old;
+          return {
+            ...old,
+            data: old.data.map((entry: any) =>
+              entry.document.id === variables.documentId
+                ? { ...entry, extraction: { ...entry.extraction, ...saved }, document: result.data?.document ?? entry.document }
+                : entry
+            ),
+          };
+        });
+      }
       queryClient.invalidateQueries({ queryKey: ["review", variables.caseId, "documents"] });
     },
   });

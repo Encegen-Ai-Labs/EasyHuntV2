@@ -488,3 +488,15 @@ Apply order when the time comes:
 3. `0009_extractions_unique_document.sql`: only after the duplicate-rows query comes back clean.
 
 The grounding column from §3 gets the next free number when that phase is released from the hold.
+
+### 8.5 Status of the safe phases (2026-10-09)
+
+Built on `origin/dev` after PR #28 (pr27 merged). Nothing here changes extraction output.
+
+- **(a) Evaluation harness:** `backend/eval/` (done).
+- **(b) Cache:** `app/services/extraction_cache.py`, `migrations/0007_extraction_cache.sql`. **Off until you apply 0007 and set `EXTRACTION_CACHE_ENABLED=true`.** `force_refresh` on upload plus an "Ignore saved results" checkbox; a reused result is marked in `validation_errors` and shown as a "Saved result" badge. Force-refresh on `/process` for an *existing* extraction is not built: it needs the replace-and-archive step and is left for when you want it.
+- **(c) Variance test:** `eval/variance.py`.
+- **(d) Corrections:** `app/services/corrections_service.py`, `migrations/0008_extraction_corrections.sql`, `eval/export_corrections.py`, page-text edits recorded too, optional "why changed" per edited field. Recording happens *after* the review save and never blocks it (section 4.2 said before; changed so a missing table can't stop a lawyer saving). `human_correction` is unchanged (still a full copy); the table is the real record. The context columns for `pipeline_version` and `source` are not stored yet because that needs new columns on `extractions` before the code writes them.
+- **Save-path fixes from 8.3:** a review update that changes no row now returns 409 instead of success and no longer moves the document's status; the extraction lookup is ordered by `id` so GET and PATCH always pick the same row; the saved extraction is written into the page's cache on success. `migrations/0009_extractions_unique_document.sql` is written but must wait for the duplicate-rows query; the pipeline now treats a lost insert race as "already processed" instead of flagging a good document.
+- **Migration apply order:** `0007`, `0008`, then `0009` only if the duplicate query is clean.
+

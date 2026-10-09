@@ -308,3 +308,7 @@ backend/templates/_sample_outputs/
 
 # real client source reports (never commit)
 backend/templates/_raw_originals/
+
+# extraction evaluation (client documents and run outputs; never commit)
+eval_data/
+eval_runs/

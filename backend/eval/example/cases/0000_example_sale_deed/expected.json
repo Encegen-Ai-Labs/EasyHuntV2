@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "labelled_by": "synthetic",
+  "labelled_on": "2026-10-09",
+  "fields": {
+    "document_type": "sale_deed",
+    "owner_name": "Ramesh Kumar Patil",
+    "previous_owner_name": "Sunil Dattatray Patil",
+    "survey_number": "45/2B",
+    "transaction_date": "1998-03-12",
+    "transaction_type": "sale",
+    "property_location": "Village Wagholi, Tal. Haveli, Dist. Pune",
+    "property_boundaries": null,
+    "area": "2 Acre 10 Gunthas",
+    "registration_number": "1234/1998",
+    "language_detected": "Marathi"
+  },
+  "alternates": {
+    "owner_name": ["Ramesh K. Patil"]
+  },
+  "transliterations": {
+    "owner_name": "Ramesh Kumar Patil"
+  },
+  "chain": [
+    { "order": 1, "owner": "Sunil Dattatray Patil", "date": "1975-06-01", "type": "Inheritance", "survey": "45/2B" },
+    { "order": 2, "owner": "Ramesh Kumar Patil", "date": "1998-03-12", "type": "Sale Deed", "survey": "45/2B" }
+  ],
+  "red_flags": [],
+  "unlabelled": []
+}

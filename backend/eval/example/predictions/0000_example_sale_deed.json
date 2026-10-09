@@ -1,0 +1,21 @@
+{
+  "document_type": "sale_deed",
+  "owner_name": "Shri Ramesh Patil Kumar",
+  "previous_owner_name": "Sunil D. Patil",
+  "survey_number": "Gat No. 45/2B",
+  "transaction_date": "1998-12-03",
+  "transaction_type": "sale",
+  "property_location": "Wagholi, Tal. Haveli, Dist. Pune",
+  "property_boundaries": "North: road",
+  "area": "2 Acres 10 Guntha",
+  "registration_number": null,
+  "language_detected": "mr",
+  "chain": [
+    { "order": 1, "owner": "Sunil Dattatray Patil", "date": "1975-06-01", "type": "Inheritance", "survey": "45/2B" },
+    { "order": 2, "owner": "Ramesh Kumar Patil", "date": "1998-03-12", "type": "Sale Deed", "survey": "45/2B" }
+  ],
+  "red_flags": [],
+  "full_text": "synthetic",
+  "has_handwritten_content": false,
+  "_meta": { "source": "ocr" }
+}

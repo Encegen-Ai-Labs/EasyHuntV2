@@ -1,0 +1,9 @@
+{
+  "id": "0000_example_sale_deed",
+  "document_type": "sale_deed",
+  "split": "holdout",
+  "language": "mr",
+  "handwriting": "none",
+  "pages": 1,
+  "notes": "Synthetic. Invented names and numbers, no real client data. No source file: the example is scored from recorded predictions."
+}

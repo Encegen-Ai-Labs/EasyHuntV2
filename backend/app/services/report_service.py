@@ -49,7 +49,7 @@ class ReportGenerationService:
         data = [
             ["Case Identifier:", str(case_obj["id"])],
             ["Property Address:", case_obj.get("location") or case_obj.get("property_name", "N/A")],
-            ["Survey Number Ref:", case_obj["survey_number"]],
+            ["Survey Number Ref:", case_obj.get("survey_number") or "N/A"],
             ["System Status:", case_obj["status"].upper()]
         ]
         

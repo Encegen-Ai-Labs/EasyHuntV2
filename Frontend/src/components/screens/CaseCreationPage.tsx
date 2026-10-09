@@ -15,19 +15,17 @@ export function CaseCreationPage() {
   const createCase = useCreateCaseMutation();
 
   const [propertyName, setPropertyName] = useState("");
-  const [surveyNumber, setSurveyNumber] = useState("");
   const [location, setLocation] = useState("");
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!propertyName.trim() || !surveyNumber.trim()) {
-      toast.error("Property name and survey number are required", "Missing Fields");
+    if (!propertyName.trim()) {
+      toast.error("Property name is required", "Missing Fields");
       return;
     }
 
     const result = await createCase.mutateAsync({
       property_name: propertyName.trim(),
-      survey_number: surveyNumber.trim(),
       location: location.trim() || undefined,
     });
 
@@ -64,19 +62,6 @@ export function CaseCreationPage() {
                   placeholder="1800 Meridian Avenue"
                   value={propertyName}
                   onChange={(e) => setPropertyName(e.target.value)}
-                  required
-                />
-              </div>
-
-              <div className="flex flex-col gap-1.5">
-                <label htmlFor="survey-number" className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-                  Survey number
-                </label>
-                <Input
-                  id="survey-number"
-                  placeholder="SY-1234"
-                  value={surveyNumber}
-                  onChange={(e) => setSurveyNumber(e.target.value)}
                   required
                 />
               </div>

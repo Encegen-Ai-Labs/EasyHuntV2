@@ -27,7 +27,7 @@ export function useCaseById(caseId: string) {
 export function useCreateCaseMutation() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (payload: { property_name: string; survey_number: string; location?: string }) =>
+    mutationFn: (payload: { property_name: string; location?: string }) =>
       apiClient.cases.create(payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: dashboardCasesQuery.key });

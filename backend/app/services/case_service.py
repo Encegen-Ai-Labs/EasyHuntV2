@@ -11,7 +11,7 @@ class CaseService:
         self,
         creator_id: str,
         property_name: str,
-        survey_number: str,
+        survey_number: Optional[str] = None,
         location: Optional[str] = None
     ) -> Dict[str, Any]:
         now = datetime.now(timezone.utc).isoformat()
@@ -19,7 +19,7 @@ class CaseService:
         payload = {
             "created_by": creator_id,
             "property_name": property_name,
-            "survey_number": survey_number,
+            "survey_number": (survey_number or "").strip() or None,
             "location": location,
             "status": "open",
             "created_at": now,

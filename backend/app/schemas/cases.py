@@ -12,7 +12,7 @@ class CaseStatusEnum(str, Enum):
 
 class CaseCreate(BaseModel):
     property_name: str
-    survey_number: str
+    survey_number: Optional[str] = None
     location: Optional[str] = None  # Accepted in POST request payload
 
 class CaseUpdate(BaseModel):
@@ -25,7 +25,7 @@ class CaseResponse(BaseModel):
     id: UUID
     created_by: UUID
     property_name: str
-    survey_number: str
+    survey_number: Optional[str] = None
     location: Optional[str] = None
     status: CaseStatusEnum
     created_at: Optional[datetime] = None  # Now handles null/missing timestamps safely

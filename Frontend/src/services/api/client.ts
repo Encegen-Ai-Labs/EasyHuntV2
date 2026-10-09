@@ -20,7 +20,7 @@ export interface CaseRecord {
   // backend field names directly (e.g. CaseWorkspacePage.tsx's header).
   property_name?: string;
   location?: string;
-  survey_number?: string;
+  survey_number?: string | null;
 }
 
 export interface UserRecord {
@@ -232,7 +232,7 @@ export const apiClient = {
       return { data: normalizeCase(item) };
     },
 
-    create: async (payload: { property_name: string; survey_number: string; location?: string }) => {
+    create: async (payload: { property_name: string; location?: string }) => {
       try {
         const res = await fetch(`${API_BASE_URL}/cases`, {
           method: "POST",

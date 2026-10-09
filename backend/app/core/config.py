@@ -23,6 +23,9 @@ class Settings(BaseSettings):
     )
     SUPABASE_JWT_SECRET: str = Field(default="dev-jwt-secret", validation_alias="SUPABASE_JWT_SECRET")
 
+    # Browser origins allowed to call the API (CORS), comma separated.
+    CORS_ORIGINS: str = Field(default="http://localhost:3000", validation_alias="CORS_ORIGINS")
+
     # Auth configuration
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
     ALGORITHM: str = "HS256"
@@ -92,6 +95,11 @@ class Settings(BaseSettings):
         extra="ignore",
         case_sensitive=False,
     )
+
+    @property
+    def cors_origin_list(self) -> list[str]:
+        return [o.strip().rstrip("/") for o in self.CORS_ORIGINS.split(",") if o.strip()]
+
 
 settings = Settings()
 

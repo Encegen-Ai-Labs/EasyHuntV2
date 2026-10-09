@@ -12,6 +12,10 @@ class DocumentRepository(BaseRepository):
         results = self.update("documents", {"id": doc_id}, {"status": status})
         return results[0] if results else None
 
+    def update_file_path(self, doc_id: str, file_path: str) -> Optional[Dict[str, Any]]:
+        results = self.update("documents", {"id": doc_id}, {"file_path": file_path})
+        return results[0] if results else None
+
     def list_by_case(self, case_id: str) -> List[Dict[str, Any]]:
         return self.select("documents", {"case_id": case_id})
 

@@ -65,6 +65,10 @@ class FakeDocRepo:
         self.doc = {**self.doc, **doc_payload}
         return self.doc
 
+    def update_file_path(self, doc_id, file_path):
+        self.doc["file_path"] = file_path
+        return self.doc
+
     def get_by_id(self, doc_id):
         return self.doc if self.doc.get("id") == doc_id else None
 
@@ -138,7 +142,7 @@ def test_validate_and_upload_returns_processing_status_and_metadata():
     )
 
     assert result["status"] == "processing"
-    assert result["file_path"] == "cases/case-1/test.pdf"
+    assert result["file_path"] == "cases/case-1/doc-1/test.pdf"
     assert result["id"] == "doc-1"
 
 
@@ -155,7 +159,7 @@ def test_authorize_case_access_then_upload_file_matches_validate_and_upload():
     result = service.upload_file("case-1", "test.pdf", b"demo", "application/pdf", current_user)
 
     assert result["status"] == "processing"
-    assert result["file_path"] == "cases/case-1/test.pdf"
+    assert result["file_path"] == "cases/case-1/doc-1/test.pdf"
 
 
 def test_authorize_case_access_blocks_unrelated_reviewer():
@@ -843,3 +847,76 @@ def test_reviewer_submission_rejects_invalid_decision_value():
 
     with pytest.raises(Exception):
         service.submit_document_review("doc-1", "reviewer-1", {}, None, "maybe")
+
+
+
+class _MultiDocRepo:
+    """Assigns a fresh id per document and keeps one storage object per path,
+    like Supabase Storage without x-upsert (a duplicate path is an error)."""
+
+    def __init__(self):
+        self.docs = {}
+        self.objects = {}
+        self.upload_options = []
+        self.client = type("Client", (), {})()
+        self.client.storage = type("Storage", (), {})()
+        self.client.storage.from_ = lambda bucket: type("Bucket", (), {"upload": self._upload})()
+
+    def _upload(self, path, file, file_options=None):
+        self.upload_options.append(file_options)
+        if path in self.objects:
+            raise RuntimeError("Duplicate")
+        self.objects[path] = file
+
+    def create_document(self, payload):
+        doc = {**payload, "id": f"doc-{len(self.docs) + 1}"}
+        self.docs[doc["id"]] = doc
+        return doc
+
+    def update_file_path(self, doc_id, file_path):
+        self.docs[doc_id]["file_path"] = file_path
+        return self.docs[doc_id]
+
+
+def test_two_same_named_uploads_in_one_case_get_separate_objects():
+    repo = _MultiDocRepo()
+    service = DocumentService(repo, FakeCaseRepo())
+    user = {"id": "reviewer-1", "role": "Reviewer"}
+
+    first = service.upload_file("case-1", "deed.pdf", b"first", "application/pdf", user)
+    second = service.upload_file("case-1", "deed.pdf", b"second", "application/pdf", user)
+
+    assert first["file_path"] != second["file_path"]
+    assert repo.objects[first["file_path"]] == b"first"
+    assert repo.objects[second["file_path"]] == b"second"
+    assert first["file_name"] == second["file_name"] == "deed.pdf"
+    assert all("x-upsert" not in options for options in repo.upload_options)
+
+
+def test_storage_path_sanitises_file_name():
+    from app.services.doc_service import document_storage_path
+
+    assert document_storage_path("c", "d", "../../etc/pass wd.pdf") == "cases/c/d/pass_wd.pdf"
+    assert document_storage_path("c", "d", "सातबारा.pdf") == "cases/c/d/_______.pdf"
+    assert document_storage_path("c", "d", "...") == "cases/c/d/document"
+
+
+def test_failed_storage_upload_removes_the_document_row():
+    repo = _MultiDocRepo()
+    deleted = []
+    repo.client.table = lambda t: type("T", (), {"delete": lambda self: type("D", (), {
+        "eq": lambda s, k, v: (deleted.append((t, k, v)) or s), "execute": lambda s: type("R", (), {"data": []})()})()})()
+    repo.objects["cases/case-1/doc-1/deed.pdf"] = b"already there"
+    service = DocumentService(repo, FakeCaseRepo())
+
+    with pytest.raises(Exception):
+        service.upload_file("case-1", "deed.pdf", b"x", "application/pdf", {"id": "reviewer-1", "role": "Reviewer"})
+
+    assert deleted == [("documents", "id", "doc-1")]
+
+
+def test_legacy_stored_path_is_still_used_for_reads():
+    # Documents uploaded before the document-id path scheme keep their old
+    # file_path; the pipeline/review read paths use the stored value as-is.
+    repo = FakeDocRepo({"id": "old-1", "case_id": "case-1", "file_path": "cases/case-1/old.pdf", "status": "llm_done"})
+    assert repo.get_by_id("old-1")["file_path"] == "cases/case-1/old.pdf"

@@ -1,4 +1,5 @@
 import mimetypes
+import re
 from typing import Dict, Any
 from app.repositories.doc_repo import DocumentRepository
 from app.repositories.case_repo import CaseRepository
@@ -9,6 +10,19 @@ from datetime import datetime, timezone
 ALLOWED_MIMETYPES = ["application/pdf", "image/png", "image/jpeg", "image/jpg"]
 MAX_FILE_SIZE = 10 * 1024 * 1024  # 10 MB
 STORAGE_BUCKET = "documents"
+
+
+def document_storage_path(case_id: str, document_id: str, file_name: str) -> str:
+    """Storage path for an uploaded original: cases/{case_id}/{document_id}/{safe name}.
+
+    The document id makes the path unique per upload. The name is reduced to a
+    safe ASCII form (storage keys reject many characters); the original name is
+    kept in documents.file_name. Documents uploaded before this scheme have the
+    older cases/{case_id}/{file_name} path stored in documents.file_path, and
+    every read uses that stored value, so both layouts keep working."""
+    base = (file_name or "").replace("\\", "/").rsplit("/", 1)[-1]
+    safe = re.sub(r"[^A-Za-z0-9._-]", "_", base).strip(".") or "document"
+    return f"cases/{case_id}/{document_id}/{safe}"
 
 
 def enhanced_page_image_path(case_id: str, document_id: str, page_number: int) -> str:
@@ -56,27 +70,38 @@ class DocumentService:
         if mime_type not in ALLOWED_MIMETYPES:
             raise PropertySystemException(f"Unsupported media type. Allowed: {ALLOWED_MIMETYPES}")
 
-        # Supabase Storage path layout: cases/{case_id}/{filename}
-        storage_path = f"cases/{case_id}/{file_name}"
-
-        # Uploading payload directly via base supabase client storage interface
-        self.doc_repo.client.storage.from_(STORAGE_BUCKET).upload(
-            path=storage_path,
-            file=file_bytes,
-            file_options={"content-type": mime_type, "x-upsert": "true"}
-        )
-
+        # Create the row first so the storage path can contain the document id:
+        # two uploads with the same file name in one case then get different
+        # objects. file_path is a placeholder until the upload succeeds.
         doc_payload = {
             "case_id": case_id,
             "file_name": file_name,
-            "file_path": storage_path,
+            "file_path": f"cases/{case_id}/pending",
             "file_size": file_size,
             "mime_type": mime_type,
             "status": "processing",
             "uploaded_by": current_user["id"],
             "created_at": datetime.now(timezone.utc).isoformat()
         }
-        return self.doc_repo.create_document(doc_payload)
+        document = self.doc_repo.create_document(doc_payload)
+        storage_path = document_storage_path(case_id, document["id"], file_name)
+
+        # No x-upsert: an existing object at this path is an error, never overwritten.
+        try:
+            self.doc_repo.client.storage.from_(STORAGE_BUCKET).upload(
+                path=storage_path,
+                file=file_bytes,
+                file_options={"content-type": mime_type}
+            )
+            updated = self.doc_repo.update_file_path(document["id"], storage_path)
+        except Exception as e:
+            logger.error("doc_service.upload_failed | document_id=%s error=%s", document["id"], e)
+            try:
+                BaseRepository(self.doc_repo.client).delete("documents", {"id": document["id"]})
+            except Exception:
+                logger.exception("doc_service.upload_cleanup_failed | document_id=%s", document["id"])
+            raise PropertySystemException("Failed to store the uploaded file")
+        return updated or {**document, "file_path": storage_path}
 
     def validate_and_upload(
         self,

@@ -11,6 +11,8 @@ from app.repositories.document_page_repo import DocumentPageRepository
 from app.services.translation_service import translate_pages
 from app.services.embedding_service import embed_text
 from app.core.logging import logger
+from app.repositories.base import BaseRepository
+from app.services.corrections_service import CorrectionRecorder
 from app.dependencies.db import get_supabase_client
 from app.dependencies.auth import RoleRequirement
 from app.core.exceptions import PropertySystemException, ResourceNotFoundError
@@ -46,6 +48,7 @@ def list_documents(
 async def upload_documents(
     case_id: str = Form(...),
     files: List[UploadFile] = File(...),
+    force_refresh: bool = Form(False),
     background_tasks: BackgroundTasks = None,
     current_user: Dict[str, Any] = Depends(RoleRequirement(["Reviewer", "Admin"])),
     service: DocumentService = Depends(get_doc_service),
@@ -82,7 +85,10 @@ async def upload_documents(
             # keep processing the rest of the batch instead of failing the request.
             results.append(DocumentUploadResult(file_name=file.filename, success=False, error=e.message))
 
-    outcome = dispatch_documents(uploaded_doc_ids, pipeline_service, background_tasks)
+    if force_refresh:
+        outcome = dispatch_documents(uploaded_doc_ids, pipeline_service, background_tasks, force_refresh=True)
+    else:
+        outcome = dispatch_documents(uploaded_doc_ids, pipeline_service, background_tasks)
     for result in results:
         if result.document and str(result.document.id) in outcome.failed_ids:
             result.error = (
@@ -229,10 +235,40 @@ def update_document_page(
     if payload.english_text is not None:
         update_data["english_text"] = payload.english_text
 
+    # Before overwriting: remember what was there, so the edit is recorded as
+    # a correction instead of replacing the only copy of the page text.
+    try:
+        previous_page = next(
+            (p for p in doc_page_repo.list_by_document(id) if p.get("page_number") == page_number), None
+        )
+    except Exception:
+        previous_page = None
+
     updated = doc_page_repo.update_page_text(id, page_number, update_data)
     if not updated:
         raise ResourceNotFoundError("Page not found")
+
+    if previous_page is not None:
+        _record_page_corrections(service, document, current_user, page_number, previous_page, payload)
     return updated
+
+
+def _record_page_corrections(service, document, current_user, page_number, previous_page, payload) -> None:
+    """Best effort (see corrections_service.py): never fails the edit."""
+    try:
+        repo = BaseRepository(service.doc_repo.client)
+        extraction = repo.select_one("extractions", {"document_id": document["id"]}, order_by="id")
+        recorder = CorrectionRecorder(repo)
+        for column in ("original_text", "english_text"):
+            new_value = getattr(payload, column)
+            if new_value is not None:
+                recorder.record_page_text(
+                    document=document, extraction_id=(extraction or {}).get("id"),
+                    reviewer_id=str(current_user["id"]), page_number=page_number, column=column,
+                    previous=previous_page.get(column), corrected=new_value,
+                )
+    except Exception as e:
+        logger.error("documents.page_correction_record_failed | document_id=%s error=%s", document.get("id"), e)
 
 @router.post("/{id}/translate", response_model=DocumentPagesResponse)
 def translate_document(

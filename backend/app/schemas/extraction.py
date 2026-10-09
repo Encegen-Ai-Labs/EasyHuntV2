@@ -46,6 +46,10 @@ class ReviewSubmission(BaseModel):
     # actions) — see ReviewService.submit_document_review for what changes
     # when this is omitted.
     decision: Optional[ExtractionStatusEnum] = None
+    # Optional why-it-was-changed per edited field (field path -> one of
+    # misread / wrong_field / hallucinated / format / other). Stored with the
+    # correction; never required.
+    reasons: Optional[Dict[str, str]] = None
 
 class ExtractionResponse(ExtractionBase):
     id: UUID

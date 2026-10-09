@@ -1,0 +1,679 @@
+{
+  "template": "hdfc-bank-title-report.docx",
+  "bank": "HDFC Bank",
+  "engine": "docxtpl (render with autoescape=True)",
+  "policy": {
+    "source_values": {
+      "extracted": "pulled from the case documents by extraction",
+      "drafted": "proposed by the system or written by the lawyer; always reviewed and confirmed by the lawyer",
+      "case_intake": "entered when the case is created or the report is issued",
+      "search_office": "taken from the Sub-Registrar / IGR search",
+      "profile": "the advocate's profile (name, place of signing)"
+    },
+    "review_levels": {
+      "must_confirm": "Legal judgement (opinion, marketability, adverse or critical remarks, tenure, SARFAESI enforceability, claims, permissions). Never auto-confirmed: a lawyer must explicitly confirm or write the value. No positive wording is drafted while the case has open red flags.",
+      "glance": "Factual checklist answer, letterhead, party or search detail that can be pre-filled from the extracted documents and shown for a quick lawyer check."
+    },
+    "rules": [
+      "A must_confirm field is never auto-confirmed: a lawyer must explicitly confirm or write its value.",
+      "The system must not draft \"clear and marketable\", \"no adverse entry\", \"enforceable\" or similar favourable wording for a must_confirm field while the case has open red flags.",
+      "A glance field may be pre-filled from extracted documents but is still shown to the lawyer for a quick check before the report is issued.",
+      "An unset field renders as empty text; no conclusion text is hard-coded in the template."
+    ]
+  },
+  "lawyer_review_required": [
+    "acquisition_proceedings_status",
+    "chain_of_title_status",
+    "encumbrance_title_status",
+    "final_encumbrance_status",
+    "final_genuineness_status",
+    "final_marketability_status",
+    "flat_special_enactment_status",
+    "flat_undivided_share_status",
+    "genuineness_checked_status",
+    "missing_documents_status",
+    "mortgage_creatable",
+    "noc_conditions",
+    "opinion_conclusion",
+    "remarks",
+    "revenue_flow_scrutiny_status",
+    "special_comments",
+    "sro_scrutiny_status",
+    "sro_tahsildar_search_status",
+    "tenure_acquisition_status",
+    "tenure_company",
+    "tenure_freehold_govt",
+    "tenure_freehold_private",
+    "tenure_govt_land",
+    "tenure_huf",
+    "tenure_leasehold_govt_agency",
+    "tenure_leasehold_private",
+    "title_clear_marketable_status",
+    "title_flows",
+    "title_history_traced_status"
+  ],
+  "must_confirm_fields": [
+    "acquisition_proceedings_status",
+    "chain_of_title_status",
+    "encumbrance_title_status",
+    "final_encumbrance_status",
+    "final_genuineness_status",
+    "final_marketability_status",
+    "genuineness_checked_status",
+    "missing_documents_status",
+    "mortgage_creatable",
+    "noc_conditions",
+    "opinion_conclusion",
+    "remarks",
+    "revenue_flow_scrutiny_status",
+    "special_comments",
+    "sro_scrutiny_status",
+    "sro_tahsildar_search_status",
+    "tenure_acquisition_status",
+    "tenure_company",
+    "tenure_freehold_govt",
+    "tenure_freehold_private",
+    "tenure_govt_land",
+    "tenure_huf",
+    "tenure_leasehold_govt_agency",
+    "tenure_leasehold_private",
+    "title_clear_marketable_status",
+    "title_history_traced_status"
+  ],
+  "notes": [
+    "Different advocate's form: title search report (TSR) for agricultural land, with the advocate's own letterhead in the body. The letterhead is now profile fields (advocate_name, advocate_qualification, advocate_designation, advocate_address, advocate_mobile, advocate_email, advocate_district), so no one's personal details are fixed in the template. See the letterhead decision.",
+    "land_parcels is one loop rendered in three places: the boundaries block, the M.E. extract list, and the Khate extract list under documents required before disbursal. Each entry: gat_number, east, west, south, north, mutation_entries. The source heading said 'Gat No. 800' in the boundaries and 'Gat No.800/1' elsewhere; the template prints the one gat_number everywhere.",
+    "title_flows replaces four separate flow-of-title tables with one row loop: each entry has gat_label and a nested list steps, lettered A, B, C ... automatically. The three later tables of the source were merged into the first table's layout.",
+    "Boundaries were two lines per gat in one place and four lines in another; both now print the same structure (East, West, South, North).",
+    "Tenure table rows (a) to (h) are eight separate answer fields (tenure_*); the source answered 'Not applicable' to all but the one that applies.",
+    "'Statues of owner/s' (source spelling) is mortgagor_nature (choice, same as IDFC).",
+    "The 7/12 extract text, the mortgage-deed line and the post-disbursal line repeat the property description; they use property_description (or seven_twelve_extract_details for the examined-documents row).",
+    "The long checklist answers that carried the same charge sentence several times are separate fields (title_clear_marketable_status, sro_tahsildar_search_status, encumbrance_title_status, final_encumbrance_status), each free text.",
+    "The final remark about which gat was searched at the SRO is remarks.",
+    "The final opinion (all-caps sentence) is opinion_conclusion; the 'Obtain - NOC from ...' instruction is noc_conditions.",
+    "Decision: the advocate letterhead is profile-driven (profile fields). The black 'ADVOCATE' emblem image is kept for now; see the letterhead decision in the notes."
+  ],
+  "open_questions": [
+    "SRO search receipt number is 'P-611/08/2026' style; search_receipt_number is free text."
+  ],
+  "fields": [
+    {
+      "name": "acquisition_proceedings_status",
+      "type": "text",
+      "required": true,
+      "source": "drafted",
+      "description": "Acquisition proceedings pending per the revenue record",
+      "review_level": "must_confirm",
+      "auto_confirm": false,
+      "draft_blocked_when_open_red_flags": true
+    },
+    {
+      "name": "advocate_address",
+      "type": "text",
+      "required": true,
+      "source": "profile",
+      "description": "Advocate's office address on the letterhead",
+      "review_level": "glance"
+    },
+    {
+      "name": "advocate_designation",
+      "type": "text",
+      "required": true,
+      "source": "profile",
+      "description": "Advocate's designation line on the letterhead (e.g. Advocate & Notary)",
+      "review_level": "glance"
+    },
+    {
+      "name": "advocate_district",
+      "type": "text",
+      "required": true,
+      "source": "profile",
+      "description": "District printed under the signature",
+      "review_level": "glance"
+    },
+    {
+      "name": "advocate_email",
+      "type": "text",
+      "required": true,
+      "source": "profile",
+      "description": "Advocate's e-mail on the letterhead",
+      "review_level": "glance"
+    },
+    {
+      "name": "advocate_mobile",
+      "type": "text",
+      "required": true,
+      "source": "profile",
+      "description": "Advocate's mobile number on the letterhead",
+      "review_level": "glance"
+    },
+    {
+      "name": "advocate_name",
+      "type": "text",
+      "required": true,
+      "source": "profile",
+      "description": "Advocate name printed in the signature / searcher line (without the 'Adv.' prefix, which stays in the template)",
+      "review_level": "glance"
+    },
+    {
+      "name": "advocate_place",
+      "type": "text",
+      "required": true,
+      "source": "profile",
+      "description": "Place of signing (e.g. Pune)",
+      "review_level": "glance"
+    },
+    {
+      "name": "advocate_qualification",
+      "type": "text",
+      "required": true,
+      "source": "profile",
+      "description": "Advocate's qualification line on the letterhead",
+      "review_level": "glance"
+    },
+    {
+      "name": "bank_branch",
+      "type": "text",
+      "required": true,
+      "source": "case_intake",
+      "description": "Bank branch or city the report is addressed to",
+      "review_level": "glance"
+    },
+    {
+      "name": "borrower_name",
+      "type": "text",
+      "required": true,
+      "source": "case_intake",
+      "description": "Borrower name(s)",
+      "review_level": "glance"
+    },
+    {
+      "name": "chain_of_title_status",
+      "type": "text",
+      "required": true,
+      "source": "drafted",
+      "description": "Whether the chain of title has been maintained throughout and is up to date",
+      "review_level": "must_confirm",
+      "auto_confirm": false,
+      "draft_blocked_when_open_red_flags": true
+    },
+    {
+      "name": "co_borrower_names",
+      "type": "text",
+      "required": false,
+      "source": "case_intake",
+      "description": "Co-borrower name(s); leave empty if none",
+      "review_level": "glance"
+    },
+    {
+      "name": "desirable_documents_post_disbursement",
+      "type": "text",
+      "required": true,
+      "source": "extracted",
+      "description": "Desirable (non-critical) documents required after disbursal; Nil if none",
+      "review_level": "glance"
+    },
+    {
+      "name": "desirable_documents_pre_disbursement",
+      "type": "text",
+      "required": true,
+      "source": "extracted",
+      "description": "Desirable (non-critical) documents required before disbursal; Nil if none",
+      "review_level": "glance"
+    },
+    {
+      "name": "district",
+      "type": "text",
+      "required": true,
+      "source": "extracted",
+      "description": "District",
+      "review_level": "glance"
+    },
+    {
+      "name": "ec_verified_status",
+      "type": "text",
+      "required": true,
+      "source": "extracted",
+      "description": "Whether the EC / search report for 13 years was verified",
+      "review_level": "glance"
+    },
+    {
+      "name": "encumbrance_title_status",
+      "type": "text",
+      "required": true,
+      "source": "drafted",
+      "description": "No encumbrances or charges; title clear and marketable",
+      "review_level": "must_confirm",
+      "auto_confirm": false,
+      "draft_blocked_when_open_red_flags": true
+    },
+    {
+      "name": "final_encumbrance_status",
+      "type": "text",
+      "required": true,
+      "source": "drafted",
+      "description": "Final certificate: no encumbrances or charges as a result of the search",
+      "review_level": "must_confirm",
+      "auto_confirm": false,
+      "draft_blocked_when_open_red_flags": true
+    },
+    {
+      "name": "final_genuineness_status",
+      "type": "text",
+      "required": true,
+      "source": "drafted",
+      "description": "Final certificate: genuineness of documents checked online and physically",
+      "review_level": "must_confirm",
+      "auto_confirm": false,
+      "draft_blocked_when_open_red_flags": true
+    },
+    {
+      "name": "final_marketability_status",
+      "type": "text",
+      "required": true,
+      "source": "drafted",
+      "description": "Final certificate: property is clear and marketable for creating the mortgage",
+      "review_level": "must_confirm",
+      "auto_confirm": false,
+      "draft_blocked_when_open_red_flags": true
+    },
+    {
+      "name": "flat_special_enactment_status",
+      "type": "text",
+      "required": true,
+      "source": "drafted",
+      "description": "If a flat: whether title is certified with reference to a special enactment",
+      "review_level": "glance"
+    },
+    {
+      "name": "flat_undivided_share_status",
+      "type": "text",
+      "required": true,
+      "source": "drafted",
+      "description": "If a flat and no special enactment: title with undivided share in land and common areas",
+      "review_level": "glance"
+    },
+    {
+      "name": "from_charge_status",
+      "type": "text",
+      "required": true,
+      "source": "extracted",
+      "description": "Sub-line under the equitable mortgage question: from charge",
+      "review_level": "glance"
+    },
+    {
+      "name": "genuineness_checked_status",
+      "type": "text",
+      "required": true,
+      "source": "drafted",
+      "description": "Genuineness of land revenue records checked at the Tehsil / Patwari office",
+      "review_level": "must_confirm",
+      "auto_confirm": false,
+      "draft_blocked_when_open_red_flags": true
+    },
+    {
+      "name": "khate_extract_details",
+      "type": "text",
+      "required": true,
+      "source": "extracted",
+      "description": "Khate extract details (names and gat numbers)",
+      "review_level": "glance"
+    },
+    {
+      "name": "loan_purpose",
+      "type": "text",
+      "required": true,
+      "source": "case_intake",
+      "description": "Purpose of loan (e.g. NON-HL)",
+      "review_level": "glance"
+    },
+    {
+      "name": "missing_documents_status",
+      "type": "text",
+      "required": true,
+      "source": "drafted",
+      "description": "No deficient or missing title document",
+      "review_level": "must_confirm",
+      "auto_confirm": false,
+      "draft_blocked_when_open_red_flags": true
+    },
+    {
+      "name": "mortgage_creatable",
+      "type": "text",
+      "required": true,
+      "source": "drafted",
+      "description": "Whether the mortgage can be created (e.g. Yes)",
+      "review_level": "must_confirm",
+      "auto_confirm": false,
+      "draft_blocked_when_open_red_flags": true
+    },
+    {
+      "name": "mortgagor_name",
+      "type": "text",
+      "required": true,
+      "source": "extracted",
+      "description": "Mortgagor / owner name(s) as they should read in the opinion",
+      "review_level": "glance"
+    },
+    {
+      "name": "mortgagor_nature",
+      "type": "choice",
+      "required": true,
+      "source": "case_intake",
+      "description": "Nature of the mortgagor (tick-box)",
+      "options": [
+        "Sole Proprietorship",
+        "Partnership",
+        "Trust",
+        "Company",
+        "LLP",
+        "Society",
+        "HUF",
+        "Individual"
+      ],
+      "review_level": "glance"
+    },
+    {
+      "name": "noc_conditions",
+      "type": "text",
+      "required": true,
+      "source": "drafted",
+      "description": "NOC / nil certificate to be obtained before disbursal; no default",
+      "review_level": "must_confirm",
+      "auto_confirm": false,
+      "draft_blocked_when_open_red_flags": true
+    },
+    {
+      "name": "opinion_conclusion",
+      "type": "text",
+      "required": true,
+      "source": "drafted",
+      "description": "Remainder of the opinion after the ownership clause: title, mortgage ability, enforceability, any conditions",
+      "review_level": "must_confirm",
+      "auto_confirm": false,
+      "draft_blocked_when_open_red_flags": true
+    },
+    {
+      "name": "property_description",
+      "type": "text",
+      "required": true,
+      "source": "extracted",
+      "description": "Full property description paragraph, including boundaries if any",
+      "review_level": "glance"
+    },
+    {
+      "name": "remarks",
+      "type": "text",
+      "required": true,
+      "source": "drafted",
+      "description": "Remarks / conditions on the report (e.g. subject to document verification); no default",
+      "review_level": "must_confirm",
+      "auto_confirm": false,
+      "draft_blocked_when_open_red_flags": true
+    },
+    {
+      "name": "report_date",
+      "type": "date",
+      "required": true,
+      "source": "case_intake",
+      "description": "Date of the report",
+      "review_level": "glance"
+    },
+    {
+      "name": "revenue_flow_scrutiny_status",
+      "type": "text",
+      "required": true,
+      "source": "drafted",
+      "description": "Scrutiny at the Tehsil / Patwari office: no discrepancy in the flow of title",
+      "review_level": "must_confirm",
+      "auto_confirm": false,
+      "draft_blocked_when_open_red_flags": true
+    },
+    {
+      "name": "revenue_search_date",
+      "type": "date",
+      "required": true,
+      "source": "search_office",
+      "description": "Date of the search at the revenue office",
+      "review_level": "glance"
+    },
+    {
+      "name": "revenue_search_years",
+      "type": "number",
+      "required": true,
+      "source": "search_office",
+      "description": "Years covered by the revenue office search",
+      "review_level": "glance"
+    },
+    {
+      "name": "roc_search_status",
+      "type": "text",
+      "required": true,
+      "source": "extracted",
+      "description": "If the title holder is a company: ROC register of charges search",
+      "review_level": "glance"
+    },
+    {
+      "name": "search_date",
+      "type": "date",
+      "required": true,
+      "source": "search_office",
+      "description": "Date of the online search",
+      "review_level": "glance"
+    },
+    {
+      "name": "search_period_years",
+      "type": "number",
+      "required": true,
+      "source": "search_office",
+      "description": "Number of years searched",
+      "review_level": "glance"
+    },
+    {
+      "name": "search_receipt_number",
+      "type": "text",
+      "required": true,
+      "source": "search_office",
+      "description": "Search receipt number",
+      "review_level": "glance"
+    },
+    {
+      "name": "seven_twelve_extract_details",
+      "type": "text",
+      "required": true,
+      "source": "extracted",
+      "description": "Description of the 7/12 extracts examined",
+      "review_level": "glance"
+    },
+    {
+      "name": "special_comments",
+      "type": "text",
+      "required": true,
+      "source": "drafted",
+      "description": "Special comments on legislative interventions (Land Reform, Urban Ceiling, Hindu Minority Act etc.)",
+      "review_level": "must_confirm",
+      "auto_confirm": false,
+      "draft_blocked_when_open_red_flags": true
+    },
+    {
+      "name": "sro_scrutiny_status",
+      "type": "text",
+      "required": true,
+      "source": "drafted",
+      "description": "Scrutiny at the SRO office: no discrepancy and all indexes available",
+      "review_level": "must_confirm",
+      "auto_confirm": false,
+      "draft_blocked_when_open_red_flags": true
+    },
+    {
+      "name": "sro_tahsildar_search_status",
+      "type": "text",
+      "required": true,
+      "source": "drafted",
+      "description": "SRO and Tahsildar search: property mutated in the mortgagor name and free from charge",
+      "review_level": "must_confirm",
+      "auto_confirm": false,
+      "draft_blocked_when_open_red_flags": true
+    },
+    {
+      "name": "sub_registrar_office",
+      "type": "text",
+      "required": false,
+      "source": "search_office",
+      "description": "Sub-Registrar office searched",
+      "review_level": "glance"
+    },
+    {
+      "name": "taluka",
+      "type": "text",
+      "required": true,
+      "source": "extracted",
+      "description": "Taluka",
+      "review_level": "glance"
+    },
+    {
+      "name": "tenure_acquisition_status",
+      "type": "text",
+      "required": true,
+      "source": "drafted",
+      "description": "Tenure row (h): acquired or in the process of acquisition under the Land Acquisition Act",
+      "review_level": "must_confirm",
+      "auto_confirm": false,
+      "draft_blocked_when_open_red_flags": true
+    },
+    {
+      "name": "tenure_company",
+      "type": "text",
+      "required": true,
+      "source": "drafted",
+      "description": "Tenure row (g): owned by / acquired from a company",
+      "review_level": "must_confirm",
+      "auto_confirm": false,
+      "draft_blocked_when_open_red_flags": true
+    },
+    {
+      "name": "tenure_freehold_govt",
+      "type": "text",
+      "required": true,
+      "source": "drafted",
+      "description": "Tenure row (b): freehold acquired from government",
+      "review_level": "must_confirm",
+      "auto_confirm": false,
+      "draft_blocked_when_open_red_flags": true
+    },
+    {
+      "name": "tenure_freehold_private",
+      "type": "text",
+      "required": true,
+      "source": "drafted",
+      "description": "Tenure row (a): freehold acquired from parties other than government",
+      "review_level": "must_confirm",
+      "auto_confirm": false,
+      "draft_blocked_when_open_red_flags": true
+    },
+    {
+      "name": "tenure_govt_land",
+      "type": "text",
+      "required": true,
+      "source": "drafted",
+      "description": "Tenure row (e): government land",
+      "review_level": "must_confirm",
+      "auto_confirm": false,
+      "draft_blocked_when_open_red_flags": true
+    },
+    {
+      "name": "tenure_huf",
+      "type": "text",
+      "required": true,
+      "source": "drafted",
+      "description": "Tenure row (f): owned by a Hindu Undivided Family",
+      "review_level": "must_confirm",
+      "auto_confirm": false,
+      "draft_blocked_when_open_red_flags": true
+    },
+    {
+      "name": "tenure_leasehold_govt_agency",
+      "type": "text",
+      "required": true,
+      "source": "drafted",
+      "description": "Tenure row (d): leasehold acquired from government agencies (GIDC, MIDC etc.)",
+      "review_level": "must_confirm",
+      "auto_confirm": false,
+      "draft_blocked_when_open_red_flags": true
+    },
+    {
+      "name": "tenure_leasehold_private",
+      "type": "text",
+      "required": true,
+      "source": "drafted",
+      "description": "Tenure row (c): leasehold acquired from parties other than government",
+      "review_level": "must_confirm",
+      "auto_confirm": false,
+      "draft_blocked_when_open_red_flags": true
+    },
+    {
+      "name": "title_clear_marketable_status",
+      "type": "text",
+      "required": true,
+      "source": "drafted",
+      "description": "Whether the applicant's title is clear, marketable, free from encumbrances and minor/HUF claims",
+      "review_level": "must_confirm",
+      "auto_confirm": false,
+      "draft_blocked_when_open_red_flags": true
+    },
+    {
+      "name": "title_history_traced_status",
+      "type": "text",
+      "required": true,
+      "source": "drafted",
+      "description": "Whether history and flow of title was traced for 13 years or more",
+      "review_level": "must_confirm",
+      "auto_confirm": false,
+      "draft_blocked_when_open_red_flags": true
+    },
+    {
+      "name": "village",
+      "type": "text",
+      "required": true,
+      "source": "extracted",
+      "description": "Village",
+      "review_level": "glance"
+    }
+  ],
+  "loops": [
+    {
+      "name": "land_parcels",
+      "type": "list",
+      "item_type": "object",
+      "required": true,
+      "min_items": 1,
+      "source": "extracted",
+      "description": "One entry per gat / survey number: boundaries and mutation entry numbers; rendered in three places",
+      "item_fields": [
+        "gat_number",
+        "east",
+        "west",
+        "south",
+        "north",
+        "mutation_entries"
+      ],
+      "review_level": "glance"
+    },
+    {
+      "name": "title_flows",
+      "type": "list",
+      "item_type": "object",
+      "required": true,
+      "min_items": 1,
+      "source": "drafted",
+      "description": "One flow-of-title table per gat; each entry has gat_label and a nested list steps (lettered A, B, ...)",
+      "item_fields": [
+        "gat_label"
+      ],
+      "nested_lists": {
+        "steps": "string"
+      },
+      "review_level": "glance"
+    }
+  ]
+}

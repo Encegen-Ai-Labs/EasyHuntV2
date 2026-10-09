@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "expected.json",
+  "description": "Documentation of the format. The authoritative checks are in eval/loader.py (validate_expected), which also rejects any scalar field that is neither labelled nor listed under 'unlabelled'.",
+  "type": "object",
+  "required": ["schema_version", "fields"],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "labelled_by": { "type": "string" },
+    "labelled_on": { "type": "string" },
+    "fields": {
+      "type": "object",
+      "description": "Correct value for each scalar field; null means 'the correct extraction is null'.",
+      "properties": {
+        "document_type": { "type": ["string", "null"] },
+        "owner_name": { "type": ["string", "null"] },
+        "previous_owner_name": { "type": ["string", "null"] },
+        "survey_number": { "type": ["string", "null"] },
+        "transaction_date": { "type": ["string", "null"], "description": "YYYY-MM-DD; YYYY-01-01 when only the year is known" },
+        "transaction_type": { "type": ["string", "null"] },
+        "property_location": { "type": ["string", "null"] },
+        "property_boundaries": { "type": ["string", "null"] },
+        "area": { "type": ["string", "null"] },
+        "registration_number": { "type": ["string", "null"] },
+        "language_detected": { "type": ["string", "null"] }
+      },
+      "additionalProperties": false
+    },
+    "alternates": {
+      "type": "object",
+      "description": "Extra acceptable values per field. Only widens what counts as correct.",
+      "additionalProperties": { "type": "array", "items": { "type": "string" } }
+    },
+    "transliterations": {
+      "type": "object",
+      "description": "Name fields only: the Latin-letter form of a name whose canonical value is in the document's script. A Latin-letter prediction is scored against this and reported as its own form.",
+      "additionalProperties": { "type": "string" }
+    },
+    "chain": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "order": { "type": "integer" }, "owner": { "type": "string" }, "date": { "type": "string" },
+          "type": { "type": "string" }, "survey": { "type": "string" }
+        }
+      }
+    },
+    "red_flags": {
+      "type": "array",
+      "items": { "type": "object", "properties": { "type": { "type": "string" }, "source_text": { "type": "string" } } }
+    },
+    "unlabelled": {
+      "type": "array",
+      "description": "Fields nobody verified. They are skipped, not counted wrong.",
+      "items": { "type": "string" }
+    }
+  }
+}

@@ -41,14 +41,17 @@ def backoff_seconds(base: int, attempt: int) -> int:
     max_retries=max(UNEXPECTED_FAILURE_RETRIES, settings.CELERY_RATE_LIMIT_RETRIES),
     acks_late=True,
 )
-def process_document_task(self: Any, document_id: str) -> Dict[str, str]:
+def process_document_task(self: Any, document_id: str, force_refresh: bool = False) -> Dict[str, str]:
     """Process one uploaded document with the same pipeline the in-process path
     uses (PipelineService.execute_analysis_pipeline, as called per document by
     execute_batch); worker concurrency replaces execute_batch's semaphore."""
     service = None
     try:
         service = _pipeline_service()
-        result = service.execute_analysis_pipeline(document_id)
+        if force_refresh:
+            result = service.execute_analysis_pipeline(document_id, True)
+        else:
+            result = service.execute_analysis_pipeline(document_id)
     except Exception as exc:
         if self.request.retries < UNEXPECTED_FAILURE_RETRIES:
             logger.exception(

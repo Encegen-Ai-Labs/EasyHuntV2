@@ -1,0 +1,632 @@
+{
+  "template": "idfc-first-bank-title-report.docx",
+  "bank": "IDFC FIRST Bank",
+  "engine": "docxtpl (render with autoescape=True)",
+  "policy": {
+    "source_values": {
+      "extracted": "pulled from the case documents by extraction",
+      "drafted": "proposed by the system or written by the lawyer; always reviewed and confirmed by the lawyer",
+      "case_intake": "entered when the case is created or the report is issued",
+      "search_office": "taken from the Sub-Registrar / IGR search",
+      "profile": "the advocate's profile (name, place of signing)"
+    },
+    "review_levels": {
+      "must_confirm": "Legal judgement (opinion, marketability, adverse or critical remarks, tenure, SARFAESI enforceability, claims, permissions). Never auto-confirmed: a lawyer must explicitly confirm or write the value. No positive wording is drafted while the case has open red flags.",
+      "glance": "Factual checklist answer, letterhead, party or search detail that can be pre-filled from the extracted documents and shown for a quick lawyer check."
+    },
+    "rules": [
+      "A must_confirm field is never auto-confirmed: a lawyer must explicitly confirm or write its value.",
+      "The system must not draft \"clear and marketable\", \"no adverse entry\", \"enforceable\" or similar favourable wording for a must_confirm field while the case has open red flags.",
+      "A glance field may be pre-filled from extracted documents but is still shown to the lawyer for a quick check before the report is issued.",
+      "An unset field renders as empty text; no conclusion text is hard-coded in the template."
+    ]
+  },
+  "lawyer_review_required": [
+    "advocate_final_opinion",
+    "declaration_mortgage_statement",
+    "declaration_title_statement",
+    "land_revenue_type",
+    "land_revenue_type_other",
+    "mortgage_approval_status",
+    "mortgage_intimation_status",
+    "mutation_extract_status",
+    "occupation_certificate_status",
+    "property_tax_payment_status",
+    "property_tenure",
+    "property_tenure_other",
+    "search_conclusion",
+    "ulc_status"
+  ],
+  "must_confirm_fields": [
+    "advocate_final_opinion",
+    "declaration_mortgage_statement",
+    "declaration_title_statement",
+    "mortgage_approval_status",
+    "property_tenure",
+    "search_conclusion",
+    "ulc_status"
+  ],
+  "notes": [
+    "Tick boxes are text checkboxes driven by choice fields (borrower_nature, mortgagor_nature, land_revenue_type, property_tenure). An unset choice leaves all boxes unticked.",
+    "The 'Others' box ticks when land_revenue_type_other / property_tenure_other is non-empty.",
+    "Fixed remnants: 'As per Banks Policy' (mortgage type row).",
+    "chain_steps does not exist in this template: the chain narrative uses structured fields plus two nested tables (chain_dev_agreements, chain_allotments)."
+  ],
+  "open_questions": [
+    "Left in place: an empty black oval shape ('Oval 3') beside the Place line. Is it a seal placeholder, and should it stay?",
+    "Left in place: two 1-pixel EMF pictures in the ownership-status row. Leftovers from the source file - remove?"
+  ],
+  "fields": [
+    {
+      "name": "advocate_final_opinion",
+      "type": "text",
+      "required": true,
+      "source": "drafted",
+      "description": "Advocate final comments / opinion in full",
+      "review_level": "must_confirm",
+      "auto_confirm": false,
+      "draft_blocked_when_open_red_flags": true
+    },
+    {
+      "name": "advocate_name",
+      "type": "text",
+      "required": true,
+      "source": "profile",
+      "description": "Advocate name printed in the signature / searcher line (without the 'Adv.' prefix, which stays in the template)",
+      "review_level": "glance"
+    },
+    {
+      "name": "advocate_place",
+      "type": "text",
+      "required": true,
+      "source": "profile",
+      "description": "Place of signing (e.g. Pune)",
+      "review_level": "glance"
+    },
+    {
+      "name": "allotment_letter_date",
+      "type": "date",
+      "required": false,
+      "source": "extracted",
+      "description": "Allotment letter date",
+      "review_level": "glance"
+    },
+    {
+      "name": "bank_branch",
+      "type": "text",
+      "required": true,
+      "source": "case_intake",
+      "description": "Bank branch or city the report is addressed to",
+      "review_level": "glance"
+    },
+    {
+      "name": "borrower_name",
+      "type": "text",
+      "required": true,
+      "source": "case_intake",
+      "description": "Borrower name(s)",
+      "review_level": "glance"
+    },
+    {
+      "name": "borrower_nature",
+      "type": "choice",
+      "required": true,
+      "source": "case_intake",
+      "description": "Nature of the borrower (tick-box)",
+      "options": [
+        "Sole Proprietorship",
+        "Partnership",
+        "Trust",
+        "Company",
+        "LLP",
+        "Society",
+        "HUF",
+        "Individual"
+      ],
+      "review_level": "glance"
+    },
+    {
+      "name": "boundary_east",
+      "type": "text",
+      "required": false,
+      "source": "extracted",
+      "description": "East boundary",
+      "review_level": "glance"
+    },
+    {
+      "name": "boundary_north",
+      "type": "text",
+      "required": false,
+      "source": "extracted",
+      "description": "North boundary",
+      "review_level": "glance"
+    },
+    {
+      "name": "boundary_south",
+      "type": "text",
+      "required": false,
+      "source": "extracted",
+      "description": "South boundary",
+      "review_level": "glance"
+    },
+    {
+      "name": "boundary_west",
+      "type": "text",
+      "required": false,
+      "source": "extracted",
+      "description": "West boundary",
+      "review_level": "glance"
+    },
+    {
+      "name": "built_up_area_sqft",
+      "type": "number",
+      "required": true,
+      "source": "extracted",
+      "description": "Built-up area in sq. ft.",
+      "review_level": "glance"
+    },
+    {
+      "name": "built_up_area_sqm",
+      "type": "number",
+      "required": true,
+      "source": "extracted",
+      "description": "Built-up area in sq. mtrs.",
+      "review_level": "glance"
+    },
+    {
+      "name": "consenting_party_names",
+      "type": "text",
+      "required": false,
+      "source": "extracted",
+      "description": "Consenting party name(s)",
+      "review_level": "glance"
+    },
+    {
+      "name": "cts_number",
+      "type": "text",
+      "required": true,
+      "source": "extracted",
+      "description": "C.T.S. number",
+      "review_level": "glance"
+    },
+    {
+      "name": "declaration_mortgage_statement",
+      "type": "text",
+      "required": true,
+      "source": "drafted",
+      "description": "Declaration line 2: statement on acceptability as mortgage",
+      "review_level": "must_confirm",
+      "auto_confirm": false,
+      "draft_blocked_when_open_red_flags": true
+    },
+    {
+      "name": "declaration_title_statement",
+      "type": "text",
+      "required": true,
+      "source": "drafted",
+      "description": "Declaration line 1: statement on title",
+      "review_level": "must_confirm",
+      "auto_confirm": false,
+      "draft_blocked_when_open_red_flags": true
+    },
+    {
+      "name": "developer_name",
+      "type": "text",
+      "required": false,
+      "source": "extracted",
+      "description": "Developer / promoter name",
+      "review_level": "glance"
+    },
+    {
+      "name": "developer_partners",
+      "type": "text",
+      "required": false,
+      "source": "extracted",
+      "description": "Developer partner(s) / signatories",
+      "review_level": "glance"
+    },
+    {
+      "name": "district",
+      "type": "text",
+      "required": true,
+      "source": "extracted",
+      "description": "District",
+      "review_level": "glance"
+    },
+    {
+      "name": "flat_numbers",
+      "type": "text",
+      "required": true,
+      "source": "extracted",
+      "description": "Flat number(s)",
+      "review_level": "glance"
+    },
+    {
+      "name": "floor",
+      "type": "text",
+      "required": true,
+      "source": "extracted",
+      "description": "Floor (e.g. 8th)",
+      "review_level": "glance"
+    },
+    {
+      "name": "gat_numbers",
+      "type": "text",
+      "required": false,
+      "source": "extracted",
+      "description": "Gat number(s)",
+      "review_level": "glance"
+    },
+    {
+      "name": "land_area_sqm",
+      "type": "number",
+      "required": false,
+      "source": "extracted",
+      "description": "Land area in sq. mtrs.",
+      "review_level": "glance"
+    },
+    {
+      "name": "land_owner_names",
+      "type": "text",
+      "required": false,
+      "source": "extracted",
+      "description": "Land owner name(s)",
+      "review_level": "glance"
+    },
+    {
+      "name": "land_revenue_type",
+      "type": "choice",
+      "required": true,
+      "source": "drafted",
+      "description": "Revenue type of the land (tick-box)",
+      "options": [
+        "Commercial",
+        "Agriculture",
+        "Residential",
+        "Others"
+      ],
+      "review_level": "glance"
+    },
+    {
+      "name": "land_revenue_type_other",
+      "type": "text",
+      "required": false,
+      "source": "drafted",
+      "description": "Specify when land_revenue_type is Others",
+      "review_level": "glance"
+    },
+    {
+      "name": "local_authority",
+      "type": "text",
+      "required": true,
+      "source": "extracted",
+      "description": "Local authority (e.g. PMC)",
+      "review_level": "glance"
+    },
+    {
+      "name": "mortgage_approval_status",
+      "type": "text",
+      "required": true,
+      "source": "drafted",
+      "description": "Whether approval for mortgage is required/obtained",
+      "review_level": "must_confirm",
+      "auto_confirm": false,
+      "draft_blocked_when_open_red_flags": true
+    },
+    {
+      "name": "mortgage_intimation_status",
+      "type": "text",
+      "required": true,
+      "source": "drafted",
+      "description": "Whether intimation of mortgage to authorities is needed",
+      "review_level": "glance"
+    },
+    {
+      "name": "mortgagor_name",
+      "type": "text",
+      "required": true,
+      "source": "extracted",
+      "description": "Mortgagor / owner name(s) as they should read in the opinion",
+      "review_level": "glance"
+    },
+    {
+      "name": "mortgagor_nature",
+      "type": "choice",
+      "required": true,
+      "source": "case_intake",
+      "description": "Nature of the mortgagor (tick-box)",
+      "options": [
+        "Sole Proprietorship",
+        "Partnership",
+        "Trust",
+        "Company",
+        "LLP",
+        "Society",
+        "HUF",
+        "Individual"
+      ],
+      "review_level": "glance"
+    },
+    {
+      "name": "mutation_extract_status",
+      "type": "text",
+      "required": true,
+      "source": "drafted",
+      "description": "Revenue/mutation extracts available",
+      "review_level": "glance"
+    },
+    {
+      "name": "occupation_certificate_status",
+      "type": "text",
+      "required": true,
+      "source": "drafted",
+      "description": "Occupation / completion certificate status",
+      "review_level": "glance"
+    },
+    {
+      "name": "project_name",
+      "type": "text",
+      "required": true,
+      "source": "extracted",
+      "description": "Project / building name",
+      "review_level": "glance"
+    },
+    {
+      "name": "property_tax_payment_status",
+      "type": "text",
+      "required": true,
+      "source": "drafted",
+      "description": "Year up to which property tax / society charges paid",
+      "review_level": "glance"
+    },
+    {
+      "name": "property_tenure",
+      "type": "choice",
+      "required": true,
+      "source": "drafted",
+      "description": "Freehold/leasehold; also drives the opinion wording (only Freehold and Leasehold produce an ownership clause)",
+      "options": [
+        "Freehold",
+        "Leasehold",
+        "Govt. land",
+        "Others"
+      ],
+      "review_level": "must_confirm",
+      "auto_confirm": false,
+      "draft_blocked_when_open_red_flags": true
+    },
+    {
+      "name": "property_tenure_other",
+      "type": "text",
+      "required": false,
+      "source": "drafted",
+      "description": "Specify when property_tenure is Others (IDFC tick-box)",
+      "review_level": "glance"
+    },
+    {
+      "name": "purchaser_name",
+      "type": "text",
+      "required": true,
+      "source": "extracted",
+      "description": "Intending purchaser name(s) (draft agreement)",
+      "review_level": "glance"
+    },
+    {
+      "name": "record_owner_name",
+      "type": "text",
+      "required": true,
+      "source": "extracted",
+      "description": "Owner(s) as per online revenue records",
+      "review_level": "glance"
+    },
+    {
+      "name": "reference_number",
+      "type": "text",
+      "required": true,
+      "source": "case_intake",
+      "description": "Firm/bank reference number printed on the report",
+      "review_level": "glance"
+    },
+    {
+      "name": "report_date",
+      "type": "date",
+      "required": true,
+      "source": "case_intake",
+      "description": "Date of the report",
+      "review_level": "glance"
+    },
+    {
+      "name": "rera_certificate_date",
+      "type": "date",
+      "required": false,
+      "source": "extracted",
+      "description": "RERA certificate date",
+      "review_level": "glance"
+    },
+    {
+      "name": "rera_number",
+      "type": "text",
+      "required": false,
+      "source": "extracted",
+      "description": "RERA registration number; empty = RERA sentence omitted",
+      "review_level": "glance"
+    },
+    {
+      "name": "rera_validity_expiry_date",
+      "type": "date",
+      "required": false,
+      "source": "extracted",
+      "description": "RERA validity expiry date; empty = expiry sentence omitted",
+      "review_level": "glance"
+    },
+    {
+      "name": "search_challan_number",
+      "type": "text",
+      "required": true,
+      "source": "search_office",
+      "description": "Search challan number",
+      "review_level": "glance"
+    },
+    {
+      "name": "search_conclusion",
+      "type": "text",
+      "required": true,
+      "source": "drafted",
+      "description": "Conclusion of the encumbrance search (e.g. whether any adverse entry was found)",
+      "review_level": "must_confirm",
+      "auto_confirm": false,
+      "draft_blocked_when_open_red_flags": true
+    },
+    {
+      "name": "search_date",
+      "type": "date",
+      "required": true,
+      "source": "search_office",
+      "description": "Search challan date",
+      "review_level": "glance"
+    },
+    {
+      "name": "search_period_from_year",
+      "type": "number",
+      "required": true,
+      "source": "search_office",
+      "description": "First year covered by the Index-II search",
+      "review_level": "glance"
+    },
+    {
+      "name": "search_period_to_year",
+      "type": "number",
+      "required": true,
+      "source": "search_office",
+      "description": "Last year covered by the Index-II search",
+      "review_level": "glance"
+    },
+    {
+      "name": "search_period_years",
+      "type": "number",
+      "required": true,
+      "source": "search_office",
+      "description": "Number of years searched",
+      "review_level": "glance"
+    },
+    {
+      "name": "search_receipt_number",
+      "type": "text",
+      "required": true,
+      "source": "search_office",
+      "description": "Search receipt number",
+      "review_level": "glance"
+    },
+    {
+      "name": "sub_registrar_office",
+      "type": "text",
+      "required": false,
+      "source": "search_office",
+      "description": "Sub-Registrar office searched",
+      "review_level": "glance"
+    },
+    {
+      "name": "taluka",
+      "type": "text",
+      "required": true,
+      "source": "extracted",
+      "description": "Taluka",
+      "review_level": "glance"
+    },
+    {
+      "name": "ulc_status",
+      "type": "text",
+      "required": true,
+      "source": "drafted",
+      "description": "Urban Land Ceiling Act status",
+      "review_level": "must_confirm",
+      "auto_confirm": false,
+      "draft_blocked_when_open_red_flags": true
+    },
+    {
+      "name": "village",
+      "type": "text",
+      "required": true,
+      "source": "extracted",
+      "description": "Village",
+      "review_level": "glance"
+    }
+  ],
+  "loops": [
+    {
+      "name": "chain_allotments",
+      "type": "list",
+      "item_type": "object",
+      "required": false,
+      "min_items": 0,
+      "source": "extracted",
+      "description": "Chain table: allotment rows",
+      "item_fields": [
+        "allottee",
+        "agreement_and_poa",
+        "allotted_units"
+      ],
+      "review_level": "glance"
+    },
+    {
+      "name": "chain_dev_agreements",
+      "type": "list",
+      "item_type": "object",
+      "required": false,
+      "min_items": 0,
+      "source": "extracted",
+      "description": "Chain table: development agreement rows",
+      "item_fields": [
+        "party",
+        "date_and_reg",
+        "area"
+      ],
+      "review_level": "glance"
+    },
+    {
+      "name": "documents_post_disbursement",
+      "type": "list",
+      "item_type": "object",
+      "required": false,
+      "min_items": 0,
+      "source": "extracted",
+      "description": "Documents to be taken after disbursement; NONE label prints when empty",
+      "item_fields": [
+        "nature",
+        "date",
+        "form"
+      ],
+      "review_level": "glance"
+    },
+    {
+      "name": "documents_pre_disbursement",
+      "type": "list",
+      "item_type": "object",
+      "required": false,
+      "min_items": 0,
+      "source": "extracted",
+      "description": "Documents to be taken before disbursement",
+      "item_fields": [
+        "nature",
+        "date",
+        "form"
+      ],
+      "review_level": "glance"
+    },
+    {
+      "name": "documents_verified",
+      "type": "list",
+      "item_type": "object",
+      "required": true,
+      "min_items": 1,
+      "source": "extracted",
+      "description": "Documents verified (nature, date, original/copy)",
+      "item_fields": [
+        "nature",
+        "date",
+        "form"
+      ],
+      "review_level": "glance"
+    }
+  ]
+}

@@ -44,16 +44,27 @@ def _mark_flagged(pipeline_service: Any, document_id: str) -> None:
         )
 
 
+def _batch_task_args(force_refresh: bool) -> dict:
+    # Only passed when set, so the default call shape is unchanged.
+    return {"force_refresh": True} if force_refresh else {}
+
+
 def dispatch_documents(
-    document_ids: List[str], pipeline_service: Any, background_tasks: Any
+    document_ids: List[str], pipeline_service: Any, background_tasks: Any,
+    force_refresh: bool = False,
 ) -> DispatchOutcome:
+    """force_refresh: ignore stored extraction results for these documents
+    (see extraction_cache.py); a lawyer re-uploading because the first read
+    looked wrong sets this."""
     outcome = DispatchOutcome()
     if not document_ids:
         return outcome
 
     if not settings.CELERY_ENABLED:
         if background_tasks is not None:
-            background_tasks.add_task(pipeline_service.execute_batch, list(document_ids))
+            background_tasks.add_task(
+                pipeline_service.execute_batch, list(document_ids), **_batch_task_args(force_refresh)
+            )
             outcome.mode = MODE_IN_PROCESS
         else:
             outcome.mode = MODE_FAILED
@@ -77,7 +88,10 @@ def dispatch_documents(
             unqueued.append(document_id)
             continue
         try:
-            process_document_task.delay(document_id)
+            if force_refresh:
+                process_document_task.delay(document_id, True)
+            else:
+                process_document_task.delay(document_id)
             outcome.queued_ids.append(document_id)
         except Exception as exc:
             last_error = exc
@@ -92,7 +106,9 @@ def dispatch_documents(
                 "check Redis and the Celery worker",
                 len(unqueued), unqueued, reason,
             )
-            background_tasks.add_task(pipeline_service.execute_batch, unqueued)
+            background_tasks.add_task(
+                pipeline_service.execute_batch, unqueued, **_batch_task_args(force_refresh)
+            )
             outcome.fallback_ids = unqueued
             outcome.warning = (
                 "The document queue is unavailable, so these documents are being processed "

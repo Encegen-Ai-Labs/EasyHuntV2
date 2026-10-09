@@ -55,6 +55,13 @@ class Settings(BaseSettings):
     # reviewer can judge weak ones. Raise it if the "Similar" section is noisy.
     SEARCH_MIN_SIMILARITY: float = Field(default=0.30, validation_alias="SEARCH_MIN_SIMILARITY")
 
+    # ---- Extraction cache (app/services/extraction_cache.py) ----
+    # Reuse the stored extraction when the exact same file (same bytes) was already
+    # extracted with the same model and pipeline version. OFF by default: it needs
+    # migrations/0007_extraction_cache.sql applied first. A lawyer can bypass it per
+    # upload (force_refresh). Failures are never cached.
+    EXTRACTION_CACHE_ENABLED: bool = Field(default=False, validation_alias="EXTRACTION_CACHE_ENABLED")
+
     # ---- Document router (OCR vs VLM routing, app/services/document_router.py) ----
     # Handwritten-area ratio at or above which a page is routed to the VLM instead
     # of the (faster, cheaper) OCR path. ratio = handwritten box area / total box area.

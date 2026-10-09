@@ -1,20 +1,25 @@
 import asyncio
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 from app.core.logging import logger
 from app.repositories.doc_repo import DocumentRepository
 from app.repositories.case_repo import CaseRepository
 from app.repositories.flag_repo import FlagRepository
 from app.repositories.document_page_repo import DocumentPageRepository
 from app.repositories.base import BaseRepository
-from app.services.llm_extractor import extract_structured_fields_from_text
+from app.services.llm_extractor import GEMINI_MODEL, extract_structured_fields_from_text
 from app.services.doc_service import STORAGE_BUCKET, enhanced_page_image_path
 from app.services.validation import validate_extraction
 from app.services.chain_service import ChainReconstructionService
 from app.services.risk_service import RiskFlaggingService
 from app.services.report_draft_service import generate_draft_report
-from app.services.page_extraction_service import download_and_rasterize, strip_annotation_tags
+from app.services.page_extraction_service import (
+    download_and_rasterize, download_file, rasterize_pages, strip_annotation_tags,
+)
+from app.services.extraction_cache import (
+    ExtractionCache, build_cache, cache_note, pipeline_version, sha256_bytes,
+)
 from app.services.image_enhancement import enhance_page_image_with_report
 from app.services.document_router import route_and_extract_page
 from app.services.embedding_service import embed_pages
@@ -96,14 +101,24 @@ def _format_red_flag_description(red_flag: Dict[str, Any]) -> str:
     return description
 
 
+_CACHE_FROM_SETTINGS = object()
+
+
 class PipelineService:
     def __init__(
         self,
         doc_repo: DocumentRepository,
         case_repo: CaseRepository,
         flag_repo: FlagRepository,
-        doc_page_repo: DocumentPageRepository
+        doc_page_repo: DocumentPageRepository,
+        extraction_cache: Any = _CACHE_FROM_SETTINGS,
     ):
+        # None = caching off. The default builds it from
+        # settings.EXTRACTION_CACHE_ENABLED (off unless explicitly enabled),
+        # which is also what the Celery worker gets.
+        self.extraction_cache: Optional[ExtractionCache] = (
+            build_cache(doc_repo.client) if extraction_cache is _CACHE_FROM_SETTINGS else extraction_cache
+        )
         self.doc_repo = doc_repo
         self.case_repo = case_repo
         self.flag_repo = flag_repo
@@ -115,6 +130,7 @@ class PipelineService:
     def _process_page(
         self, case_id: str, doc_id: str, index: int, page_image: bytes,
         also_extract_fields: bool = False,
+        replay: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """Enhances, persists, and routes one page. Runs inside the
         ThreadPoolExecutor in execute_analysis_pipeline below — every step
@@ -173,6 +189,13 @@ class PipelineService:
                 doc_id, page_number, e,
             )
 
+        if replay is not None:
+            # Cache hit: this page's routing result was stored by an earlier
+            # run on the same file. The enhanced image above is still
+            # produced and stored (it is what the Admin diagnostic shows);
+            # only the OCR/VLM work is skipped.
+            return replay
+
         route_started = time.monotonic()
         routed = route_and_extract_page(
             enhanced, page_number=page_number, also_extract_fields=also_extract_fields,
@@ -187,7 +210,10 @@ class PipelineService:
         )
         return routed
 
-    def execute_analysis_pipeline(self, doc_id: str) -> Dict[str, Any]:
+    def execute_analysis_pipeline(self, doc_id: str, force_refresh: bool = False) -> Dict[str, Any]:
+        """force_refresh: ignore any stored result for this file and run a
+        fresh extraction (the new result replaces the stored one). Only
+        relevant when the extraction cache is on."""
         # Check if this document was already processed - avoid duplicate LLM calls
         existing = self.generic_repo.select("extractions", {"document_id": doc_id})
         if existing:
@@ -225,8 +251,16 @@ class PipelineService:
         # where OCR's own confidence is too low to trust. See
         # app/services/document_router.py for the routing rule and
         # app/services/image_enhancement.py for what "enhance" does.
+        content_sha256: Optional[str] = None
         try:
-            page_images = download_and_rasterize(file_url, doc.get("mime_type", "application/pdf"))
+            if self.extraction_cache is None:
+                page_images = download_and_rasterize(file_url, doc.get("mime_type", "application/pdf"))
+            else:
+                # Same two steps download_and_rasterize does, split so the
+                # downloaded bytes can be hashed for the cache key.
+                file_bytes = download_file(file_url)
+                content_sha256 = sha256_bytes(file_bytes)
+                page_images = rasterize_pages(file_bytes, doc.get("mime_type", "application/pdf"))
         except Exception as e:
             logger.error("pipeline.rasterization_failed | document_id=%s error=%s", doc_id, e)
             self.doc_repo.update_status(doc_id, "flagged")
@@ -238,6 +272,20 @@ class PipelineService:
             }
 
         logger.info("pipeline.rasterized | document_id=%s pages=%s", doc_id, len(page_images))
+
+        cache_entry: Optional[Dict[str, Any]] = None
+        if self.extraction_cache is not None and content_sha256:
+            if force_refresh:
+                logger.info("pipeline.cache_bypassed | document_id=%s reason=force_refresh", doc_id)
+            else:
+                cache_entry = self.extraction_cache.get(content_sha256)
+                if cache_entry and len(cache_entry["routed_pages"]) != len(page_images):
+                    logger.error("pipeline.cache_page_count_mismatch | document_id=%s", doc_id)
+                    cache_entry = None
+                logger.info(
+                    "pipeline.cache_%s | document_id=%s sha256=%s",
+                    "hit" if cache_entry else "miss", doc_id, content_sha256[:12],
+                )
 
         # Pages are enhanced + routed concurrently (bounded — see
         # MAX_CONCURRENT_PAGES_PER_DOCUMENT above) instead of one at a time:
@@ -265,6 +313,7 @@ class PipelineService:
                 executor.submit(
                     self._process_page, case_id, doc_id, index, page_image,
                     combine_single_page_extraction,
+                    cache_entry["routed_pages"][index] if cache_entry else None,
                 ): index
                 for index, page_image in enumerate(page_images)
             }
@@ -308,12 +357,21 @@ class PipelineService:
         # None either way, so this check covers all three the same way).
         combined_fields = routed_pages[0].get("structured_fields") if combine_single_page_extraction else None
 
-        if combined_fields is not None:
+        if cache_entry is not None:
             result: Dict[str, Any] = {
                 "success": True,
                 "raw_output": None,
+                "extracted": cache_entry["extracted"],
+                "model_used": cache_entry["model_used"],
+                "error": None,
+            }
+            logger.info("pipeline.structured_extraction | document_id=%s (served from cache)", doc_id)
+        elif combined_fields is not None:
+            result = {
+                "success": True,
+                "raw_output": None,
                 "extracted": combined_fields,
-                "model_used": "gemini-3.5-flash-lite",
+                "model_used": GEMINI_MODEL,
                 "error": None,
             }
             logger.info(
@@ -354,6 +412,9 @@ class PipelineService:
                 "rate_limited": bool(result.get("rate_limited")),
             }
 
+        if self.extraction_cache is not None and content_sha256 and cache_entry is None:
+            self.extraction_cache.put(content_sha256, routed_pages, result)
+
         extracted = dict(result["extracted"])
         extracted["full_text"] = merged_text
         extracted["has_handwritten_content"] = any_handwriting
@@ -370,7 +431,9 @@ class PipelineService:
             "validated_json_output": validated_json,
             "confidence": extracted.get("overall_confidence", "low"),
             "model_used": result["model_used"],
-            "validation_errors": validation_result["errors"] + validation_result["warnings"],
+            "validation_errors": validation_result["errors"] + validation_result["warnings"] + (
+                [cache_note(cache_entry, pipeline_version())] if cache_entry else []
+            ),
             "needs_review": validation_result["needs_human_review"],
             "has_handwritten_content": any_handwriting
         }
@@ -378,6 +441,22 @@ class PipelineService:
         try:
             self.generic_repo.insert("extractions", extraction_payload)
         except Exception as e:
+            # If a concurrent run for this same document already stored its
+            # extraction (possible when extractions.document_id is unique,
+            # migrations/0009), this one lost the race: that is not a
+            # failure, and must not flag a document that is fine.
+            try:
+                already = self.generic_repo.select("extractions", {"document_id": doc_id})
+            except Exception:
+                already = []
+            if already:
+                logger.info("pipeline.extraction_insert_lost_race | document_id=%s", doc_id)
+                return {
+                    "status": "already_processed",
+                    "case_id": case_id,
+                    "document_id": doc_id,
+                    "extracted": already[0]["validated_json_output"],
+                }
             # Unlike the document_pages/ownership_chain/flag inserts below
             # (all secondary — the pipeline is still useful without them),
             # the extractions row IS the primary record this method exists
@@ -530,7 +609,7 @@ class PipelineService:
             "needs_review": validation_result["needs_human_review"]
         }
 
-    async def execute_batch(self, doc_ids: List[str]) -> None:
+    async def execute_batch(self, doc_ids: List[str], force_refresh: bool = False) -> None:
         """Runs execute_analysis_pipeline for multiple documents (one batch upload's
         worth) with bounded concurrency, instead of firing every extraction at once."""
         logger.info(
@@ -542,7 +621,10 @@ class PipelineService:
         async def _run_one(doc_id: str) -> None:
             async with semaphore:
                 try:
-                    await asyncio.to_thread(self.execute_analysis_pipeline, doc_id)
+                    if force_refresh:
+                        await asyncio.to_thread(self.execute_analysis_pipeline, doc_id, True)
+                    else:
+                        await asyncio.to_thread(self.execute_analysis_pipeline, doc_id)
                 except Exception:
                     # execute_analysis_pipeline already catches its own known
                     # failure points (rasterization, structured extraction)

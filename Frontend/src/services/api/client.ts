@@ -304,11 +304,13 @@ export const apiClient = {
     upload: (
       caseId: string,
       files: File[],
-      options?: { signal?: AbortSignal; onProgress?: (percent: number) => void }
+      options?: { signal?: AbortSignal; onProgress?: (percent: number) => void; forceRefresh?: boolean }
     ): Promise<{ success: boolean; data?: BatchUploadResponse; error?: string }> => {
       return new Promise((resolve) => {
         const formData = new FormData();
         formData.append("case_id", caseId);
+        // Ignore any saved extraction for these exact files and read them afresh.
+        if (options?.forceRefresh) formData.append("force_refresh", "true");
         files.forEach((file) => formData.append("files", file));
 
         const xhr = new XMLHttpRequest();
@@ -589,7 +591,7 @@ export const apiClient = {
       documentId: string,
       // decision omitted (undefined) saves the reviewer's field edits without
       // finalizing approve/reject — see backend/app/services/review_service.py.
-      payload: { validated_output: Record<string, any>; review_notes?: string; decision?: "approved" | "rejected" }
+      payload: { validated_output: Record<string, any>; review_notes?: string; decision?: "approved" | "rejected"; reasons?: Record<string, string> }
     ): Promise<{ success: boolean; data?: any; error?: string }> => {
       try {
         const res = await fetch(`${API_BASE_URL}/review/documents/${documentId}`, {

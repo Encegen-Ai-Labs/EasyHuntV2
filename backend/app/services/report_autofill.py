@@ -16,7 +16,7 @@ from typing import Any, Callable, Dict, List, Optional
 from google.genai import types
 
 from app.core.logging import logger
-from app.services.llm_extractor import GEMINI_MODEL, _clean_json_response, client_genai
+from app.services.llm_extractor import GEMINI_MODEL, _clean_json_response
 from app.services.llm_usage import generate_tracked
 
 AUTOFILL_TIMEOUT_MS = 120_000

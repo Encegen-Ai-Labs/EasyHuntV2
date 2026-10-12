@@ -23,15 +23,15 @@ Until now the only safety was whoever remembered to run the tests. With five law
 
 ## CI: `.github/workflows/ci.yml`
 
-Runs on every pull request into `dev` or `main`, and on every push to them. Five jobs run side by side:
+Runs on every pull request into `dev` or `main`, and on every push to them. Four jobs run side by side; each is a **required check** (set in GitHub, see below). Each check exists because of something specific in this app:
 
-| Job | What it does | Blocks the merge? |
+| Job | What it checks | Why this app needs it |
 |---|---|---|
-| **Backend tests** | installs the backend, runs all the Python tests with **fake credentials and no network to Supabase or Gemini** | Yes |
-| **Frontend checks and build** | type check, unit tests, production build | Yes (lint is report-only for now) |
-| **Backend image builds and starts** | builds the Docker image, checks no `.env` file is inside it, starts it and calls `/health` | Yes |
-| **Secret and dependency scan** | `gitleaks` reads the whole git history for keys and passwords; `pip-audit` and `npm audit` list known-vulnerable libraries | The secret scan blocks; the audits only report |
-| Lint (inside the first two) | style and unused-code checks | No, report-only until the existing warnings are cleaned |
+| **Backend tests** | lint for code that cannot run (undefined names, duplicate definitions, unused imports) and every Python test, with **fake credentials and no network** | A broken extraction, search or report path reaches a lawyer's client documents. |
+| ↳ the guards inside it (`tests/test_app_guards.py`) | every endpoint except login and health needs a signed-in user; every Gemini call goes through the cost tracker; no API key is put in a URL; **each of the nine bank templates and its field list agree** (nothing printed that is never filled, nothing asked for that is never printed); migrations are numbered without gaps, repeatable, and destroy nothing | An open endpoint exposes client records; an untracked model call spends money invisibly; a key in a URL leaks into logs (this already happened once); a template/field mismatch silently produces a wrong bank report; a destructive migration cannot be rolled back. |
+| **Frontend checks and build** | production build, type check, unit tests, and that no `NEXT_PUBLIC_` variable looks like a secret (lint is report-only until the existing warnings are fixed) | Anything `NEXT_PUBLIC_` is sent to every browser. |
+| **Backend image builds and starts** | builds the image; no `.env` inside; runs as a normal user, not root; has LibreOffice, the Marathi and Hindi OCR packs and the Devanagari font; **turns a bank report with Marathi text into a real PDF inside the image**; starts and answers `/health` | The lawyers' bank PDFs and Marathi OCR depend on system packages that unit tests on a laptop cannot see. |
+| **Secret and dependency scan** | `gitleaks` over the whole history (blocks); `pip-audit` and `npm audit` (report only) | A committed key cannot be un-committed; known-vulnerable libraries should be seen. |
 
 The fake credentials matter: a test that accidentally reaches the real database or model fails here, instead of spending money or touching client data.
 
@@ -61,7 +61,7 @@ On the server, in the app folder: `sh deploy.sh "$(cat .last_good_tag)"` returns
 
 ## One-time setup (when you get a server)
 
-1. **Repository settings → Branches:** protect `dev` and `main`: require pull requests, require the CI checks (`Backend tests`, `Frontend checks and build`, `Backend image builds and starts`, `Secret and dependency scan`), require one review, no direct pushes.
+1. **Repository settings → Branches:** protect `dev` and `main`: require pull requests, require the CI checks (the four job names in the table above), require one review, no direct pushes.
 2. **Settings → Environments:** create `staging` and `production`. On `production` add **Required reviewers** (yourself and one other person).
 3. **On the server:** install Docker, make a folder (say `/opt/easyhunt`), put the real `backend/.env` there as `backend/.env` (never in git), and put a reverse proxy (Caddy or nginx) in front for HTTPS. Create a dedicated user whose only job is deploying.
 4. **In each GitHub environment:** add variables `DEPLOY_HOST`, `DEPLOY_USER`, `DEPLOY_PATH`, `DEPLOY_KNOWN_HOSTS` (the output of `ssh-keyscan <host>`), and the secret `DEPLOY_SSH_KEY` (a private key made just for this; add its public half to the deploy user's `authorized_keys`). Use a different key per environment.

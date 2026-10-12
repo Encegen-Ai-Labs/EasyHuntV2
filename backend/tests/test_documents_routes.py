@@ -198,7 +198,7 @@ class StubDocPageRepoForUpdate:
         return {**self.existing_page, **data}
 
 
-def test_update_document_page_saves_original_text_and_regenerates_embedding(monkeypatch):
+def test_update_document_page_saves_original_text(monkeypatch):
     _login()
     doc_repo = StubDocRepo(doc={"id": DOC_ID, "case_id": CASE_ID})
     app.dependency_overrides[get_doc_service] = lambda: StubDocService(doc_repo=doc_repo)
@@ -206,10 +206,6 @@ def test_update_document_page_saves_original_text_and_regenerates_embedding(monk
     stub_repo = StubDocPageRepoForUpdate()
     app.dependency_overrides[get_doc_page_repo] = lambda: stub_repo
 
-    monkeypatch.setattr(
-        "app.api.v1.documents.embed_text",
-        lambda text: {"success": True, "embedding": [0.1, 0.2], "error": None},
-    )
 
     client = TestClient(app)
     response = client.patch(
@@ -222,10 +218,9 @@ def test_update_document_page_saves_original_text_and_regenerates_embedding(monk
     assert response.json()["original_text"] == "corrected दिनांक text"
     _, _, data = stub_repo.last_update
     assert data["original_text"] == "corrected दिनांक text"
-    assert data["embedding"] == [0.1, 0.2]
 
 
-def test_update_document_page_keeps_old_embedding_when_reembed_fails(monkeypatch):
+def test_update_document_page_updates_english_text(monkeypatch):
     _login()
     doc_repo = StubDocRepo(doc={"id": DOC_ID, "case_id": CASE_ID})
     app.dependency_overrides[get_doc_service] = lambda: StubDocService(doc_repo=doc_repo)
@@ -233,37 +228,6 @@ def test_update_document_page_keeps_old_embedding_when_reembed_fails(monkeypatch
     stub_repo = StubDocPageRepoForUpdate()
     app.dependency_overrides[get_doc_page_repo] = lambda: stub_repo
 
-    monkeypatch.setattr(
-        "app.api.v1.documents.embed_text",
-        lambda text: {"success": False, "embedding": None, "error": "Gemini timeout"},
-    )
-
-    client = TestClient(app)
-    response = client.patch(
-        f"/api/v1/documents/{DOC_ID}/pages/1",
-        json={"original_text": "corrected text"},
-        headers={"Authorization": "Bearer test"},
-    )
-
-    assert response.status_code == 200
-    _, _, data = stub_repo.last_update
-    assert "embedding" not in data  # old embedding left untouched, not nulled out
-    assert data["original_text"] == "corrected text"
-
-
-def test_update_document_page_updates_english_text_without_reembedding(monkeypatch):
-    _login()
-    doc_repo = StubDocRepo(doc={"id": DOC_ID, "case_id": CASE_ID})
-    app.dependency_overrides[get_doc_service] = lambda: StubDocService(doc_repo=doc_repo)
-
-    stub_repo = StubDocPageRepoForUpdate()
-    app.dependency_overrides[get_doc_page_repo] = lambda: stub_repo
-
-    embed_calls = []
-    monkeypatch.setattr(
-        "app.api.v1.documents.embed_text",
-        lambda text: embed_calls.append(text) or {"success": True, "embedding": [1.0], "error": None},
-    )
 
     client = TestClient(app)
     response = client.patch(
@@ -274,7 +238,6 @@ def test_update_document_page_updates_english_text_without_reembedding(monkeypat
 
     assert response.status_code == 200
     assert response.json()["english_text"] == "corrected english"
-    assert embed_calls == []  # no re-embed call for an English-only edit
     _, _, data = stub_repo.last_update
     assert "original_text" not in data
 
@@ -316,10 +279,6 @@ def test_update_document_page_404s_for_missing_page(monkeypatch):
     app.dependency_overrides[get_doc_service] = lambda: StubDocService(doc_repo=doc_repo)
     app.dependency_overrides[get_doc_page_repo] = lambda: StubDocPageRepoForUpdate(
         existing_page={"document_id": DOC_ID, "page_number": 1}
-    )
-    monkeypatch.setattr(
-        "app.api.v1.documents.embed_text",
-        lambda text: {"success": True, "embedding": [0.1], "error": None},
     )
 
     client = TestClient(app)

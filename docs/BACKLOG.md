@@ -62,3 +62,5 @@ Found while writing the production plan; the plan schedules them, this list keep
 - **Supabase advisor warnings:** set a fixed `search_path` on `match_document_pages` and `extraction_corrections_no_update`; move the `vector` extension out of `public`.
 - **Server set-up for CD** (staging and production hosts, deploy keys, branch protection): steps in CICD.md.
 - **Frontend error tracking** (`@sentry/nextjs`) is not added; only the backend reports to Sentry.
+
+- **Drop the unused embedding pieces from the database** in a new migration marked `-- destructive-ok`: `document_pages.embedding` (and its index), the `match_document_pages` function, and move the `vector` extension out of `public`. The code no longer uses them.

@@ -7,7 +7,7 @@ import fitz  # PyMuPDF
 from PIL import Image
 from google.genai import types
 
-from app.services.llm_extractor import GEMINI_MODEL, client_genai, _clean_json_response
+from app.services.llm_extractor import GEMINI_MODEL, client_genai, _clean_json_response  # noqa: F401  (tests patch page_extraction_service.client_genai)
 from app.services.rate_limit import is_rate_limit_error
 from app.services.llm_usage import generate_tracked
 from app.core.redaction import safe_error

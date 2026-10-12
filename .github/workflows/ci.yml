@@ -36,6 +36,12 @@ jobs:
       - name: System packages (OCR engine the image tests expect)
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends tesseract-ocr tesseract-ocr-eng
       - run: pip install -r requirements.txt
+      # Catches code that cannot run: undefined names, duplicate definitions, unused imports.
+      - name: Lint (blocks the merge)
+        run: pip install ruff && ruff check app scripts --select E9,F63,F7,F82,F811,F401
+      # Besides ordinary tests this runs the guards in tests/test_app_guards.py: every endpoint
+      # needs a login, every model call is cost-tracked, no key goes in a URL, each bank template
+      # matches its field list, migrations are repeatable and destroy nothing.
       - name: Tests
         run: python -m pytest -q
         env:
@@ -43,9 +49,6 @@ jobs:
           SUPABASE_URL: http://127.0.0.1:1
           SUPABASE_KEY: ci-placeholder
           GEMINI_API_KEY: ci-placeholder
-      - name: Lint (report only for now)
-        run: pip install ruff && ruff check app --select E9,F63,F7,F82,F401 --output-format=github
-        continue-on-error: true
 
   frontend:
     name: Frontend checks and build
@@ -74,6 +77,12 @@ jobs:
       - name: Lint (report only for now)
         run: npm run lint
         continue-on-error: true
+      # Anything named NEXT_PUBLIC_ is sent to every browser. A key there would be public.
+      - name: No secret can reach the browser
+        run: |
+          if grep -rEn "NEXT_PUBLIC_[A-Z0-9_]*(KEY|SECRET|TOKEN|PASSWORD)" src; then
+            echo "A NEXT_PUBLIC_ variable looks like a secret"; exit 1
+          fi
 
   docker:
     name: Backend image builds and starts
@@ -88,6 +97,20 @@ jobs:
           if docker run --rm --entrypoint sh easyhunt-backend:ci -c 'test -e /app/.env || find /app -name ".env*" ! -name ".env.example" | grep .'; then
             echo "A .env file is inside the image"; exit 1
           fi
+      - name: Runs as an ordinary user, not root
+        run: |
+          uid=$(docker run --rm --entrypoint id easyhunt-backend:ci -u)
+          if [ "$uid" = "0" ]; then echo "The container runs as root"; exit 1; fi
+      - name: Has what the app needs (PDF converter, Marathi and Hindi OCR, Devanagari font)
+        run: |
+          docker run --rm --entrypoint sh easyhunt-backend:ci -c '
+            command -v soffice >/dev/null || { echo "LibreOffice missing: bank PDFs would fail"; exit 1; }
+            tesseract --list-langs | grep -qx mar || { echo "Marathi OCR pack missing"; exit 1; }
+            tesseract --list-langs | grep -qx hin || { echo "Hindi OCR pack missing"; exit 1; }
+            test -f app/assets/fonts/NotoSansDevanagari.ttf || { echo "Devanagari PDF font missing"; exit 1; }
+          '
+      - name: A bank report with Marathi text becomes a real PDF in this image
+        run: docker run --rm easyhunt-backend:ci python -m scripts.smoke_render
       - name: Starts and answers /health
         run: |
           docker run -d --name api -p 8000:8000 \

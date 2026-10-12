@@ -1,6 +1,5 @@
 import io
 import os
-from typing import Any, Dict, List
 
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import letter

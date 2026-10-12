@@ -141,18 +141,6 @@ def generate_tracked(kind: str, **kwargs: Any) -> Any:
     return response
 
 
-def embed_tracked(**kwargs: Any) -> Any:
-    """client.models.embed_content(**kwargs), recorded as an embedding call."""
-    from app.services.llm_extractor import client_genai
-
-    contents = kwargs.get("contents")
-    chars = len(contents) if isinstance(contents, str) else None
-    with LlmCall(EMBEDDING, kwargs.get("model", "unknown"), chars_in=chars) as call:
-        response = client_genai.models.embed_content(**kwargs)
-        call.response = response
-    return response
-
-
 # ---- budget guard ----------------------------------------------------------
 
 def _start_of_today_utc() -> str:

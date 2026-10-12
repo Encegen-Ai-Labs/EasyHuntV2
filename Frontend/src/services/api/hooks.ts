@@ -144,20 +144,6 @@ export function useProcessDocumentMutation() {
   });
 }
 
-export function useGenerateReportMutation() {
-  return useMutation({
-    mutationFn: (caseId: string) => apiClient.reports.generate(caseId),
-  });
-}
-
-export function useDownloadReportQuery(caseId: string) {
-  return useQuery({
-    queryKey: ["reports", "download", caseId],
-    queryFn: () => apiClient.reports.download(caseId),
-    enabled: Boolean(caseId),
-  });
-}
-
 export function useFlagsQuery(caseId?: string) {
   return useQuery({
     queryKey: ["flags", caseId || "all"],

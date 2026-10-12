@@ -91,12 +91,6 @@ def _search_service(page_repo):
 USER = {"id": "u1", "role": "Reviewer"}
 
 
-def test_exact_search_covers_only_approved_documents():
-    pages = _PageRepo()
-    _search_service(pages).search_case("case-1", "Patil", USER)
-    assert pages.exact_ids == ["approved-doc"]
-
-
 def test_term_lookup_covers_only_approved_documents():
     pages = _PageRepo()
     terms = _search_service(pages).find_terms("case-1", "Patil", USER)

@@ -7,7 +7,6 @@ from app.api.v1.cases import get_case_service
 from app.dependencies.auth import get_current_user
 from app.main import app
 from app.services.case_service import CaseService
-from app.services.report_service import ReportGenerationService
 
 CASE_ID = "22222222-2222-2222-2222-222222222222"
 USER_ID = "33333333-3333-3333-3333-333333333333"
@@ -69,18 +68,3 @@ def test_get_case_with_null_survey_number_serialises_null():
 
     assert res.status_code == 200, res.text
     assert res.json()["survey_number"] is None
-
-
-@pytest.mark.parametrize("survey", [None, ""])
-def test_verification_pdf_builder_handles_missing_survey_number(survey):
-    uploads = []
-    storage = SimpleNamespace(from_=lambda bucket: SimpleNamespace(upload=lambda **kw: uploads.append(kw)))
-    report_repo = SimpleNamespace(client=SimpleNamespace(storage=storage), create_report=lambda p: p)
-    case_repo = SimpleNamespace(get_by_id=lambda cid: {
-        "id": CASE_ID, "property_name": "Plot 42", "location": None,
-        "survey_number": survey, "status": "open",
-    })
-
-    ReportGenerationService(case_repo, report_repo).generate_pdf_report(CASE_ID, USER_ID)
-
-    assert uploads and uploads[0]["file"].startswith(b"%PDF")

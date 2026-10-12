@@ -1,5 +1,4 @@
 import time
-import mimetypes
 import re
 from typing import Dict, Any
 from app.repositories.doc_repo import DocumentRepository

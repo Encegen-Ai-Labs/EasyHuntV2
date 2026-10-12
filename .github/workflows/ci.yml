@@ -110,8 +110,7 @@ jobs:
             test -f app/assets/fonts/NotoSansDevanagari.ttf || { echo "Devanagari PDF font missing"; exit 1; }
           '
       - name: A bank report with Marathi text becomes a real PDF in this image
-        run: |
-          docker run --rm -e SUPABASE_URL=http://127.0.0.1:1 -e SUPABASE_KEY=ci-placeholder -e GEMINI_API_KEY=ci-placeholder \n            easyhunt-backend:ci python -m scripts.smoke_render
+        run: docker run --rm -e SUPABASE_URL=http://127.0.0.1:1 -e SUPABASE_KEY=ci-placeholder -e GEMINI_API_KEY=ci-placeholder easyhunt-backend:ci python -m scripts.smoke_render
       - name: Starts and answers /health
         run: |
           docker run -d --name api -p 8000:8000 \

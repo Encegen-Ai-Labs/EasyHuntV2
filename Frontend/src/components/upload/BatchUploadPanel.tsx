@@ -27,6 +27,9 @@ export function BatchUploadPanel({ caseId, onUploaded }: BatchUploadPanelProps) 
   // How many files the last upload accepted; drives the "check the extracted
   // fields" notice, which stays until the lawyer dismisses it.
   const [uploadedCount, setUploadedCount] = useState(0);
+  // Files the server refused or could not store, with the reason, until retried or dismissed.
+  const [failedFiles, setFailedFiles] = useState<{ file: File; error: string }[]>([]);
+  const [requestError, setRequestError] = useState<string | null>(null);
   const [queueWarning, setQueueWarning] = useState<string | null>(null);
   // When the same file was extracted before, its saved result is reused. A
   // lawyer who re-uploads because that read looked wrong ticks this to get a
@@ -80,6 +83,9 @@ export function BatchUploadPanel({ caseId, onUploaded }: BatchUploadPanelProps) 
 
     setIsUploading(true);
     setUploadProgress(0);
+    setFailedFiles([]);
+    setRequestError(null);
+    const submitted = queuedFiles;
     const controller = new AbortController();
     abortControllerRef.current = controller;
 
@@ -94,6 +100,7 @@ export function BatchUploadPanel({ caseId, onUploaded }: BatchUploadPanelProps) 
     abortControllerRef.current = null;
 
     if (!result.success || !result.data) {
+      setRequestError(result.error || "The upload could not be completed.");
       toast.error(result.error || "Batch upload failed", "Upload Error");
       return;
     }
@@ -102,6 +109,13 @@ export function BatchUploadPanel({ caseId, onUploaded }: BatchUploadPanelProps) 
     const failed = result.data.results.length - succeeded;
 
     setQueuedFiles([]);
+    // Results come back in the order the files were sent.
+    setFailedFiles(
+      result.data.results
+        .map((r, index) => ({ r, file: submitted[index] }))
+        .filter(({ r, file }) => !r.success && file)
+        .map(({ r, file }) => ({ file, error: r.error || "The file could not be uploaded." }))
+    );
 
     if (succeeded > 0) {
       setUploadedCount(succeeded);
@@ -257,6 +271,41 @@ export function BatchUploadPanel({ caseId, onUploaded }: BatchUploadPanelProps) 
           <AlertTriangle size={14} className="mt-0.5 shrink-0" />
           {queueWarning}
         </p>
+      )}
+
+      {requestError && (
+        <div role="alert" className="rounded-lg bg-destructive/10 px-4 py-3 text-sm text-destructive">
+          <p className="font-medium">Nothing was uploaded.</p>
+          <p className="mt-0.5">{requestError}</p>
+        </div>
+      )}
+
+      {failedFiles.length > 0 && (
+        <div role="alert" className="rounded-lg bg-destructive/10 px-4 py-3 text-sm">
+          <p className="font-medium text-destructive">
+            {failedFiles.length} file{failedFiles.length === 1 ? " was" : "s were"} not uploaded
+          </p>
+          <ul className="mt-1.5 flex flex-col gap-1">
+            {failedFiles.map(({ file, error }) => (
+              <li key={file.name} className="text-destructive">
+                <span className="font-medium">{file.name}</span>
+                <span className="text-destructive/80">: {error}</span>
+              </li>
+            ))}
+          </ul>
+          <div className="mt-3 flex gap-2">
+            <Button
+              size="sm"
+              onClick={() => {
+                setQueuedFiles(failedFiles.map((f) => f.file));
+                setFailedFiles([]);
+              }}
+            >
+              Retry {failedFiles.length === 1 ? "this file" : "these files"}
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => setFailedFiles([])}>Dismiss</Button>
+          </div>
+        </div>
       )}
 
       {uploadedCount > 0 && (

@@ -32,6 +32,12 @@ What enforces that:
 - The access log line has method, path, status, duration and user id. **No request bodies, no document text** are logged.
 - Docker keeps 5 files of 10 MB per container (`docker-compose.yml`), so logs cannot fill the disk. Read them with `docker compose logs -f api` or `docker compose logs api | grep <request-id>`.
 
+## 2b. Server errors in the admin screen
+
+Every error-level log line is also saved (secrets removed) in the `app_errors` table: when, what, the request reference, and which user, case and document it was for. Admins read the latest 50 under **Usage → Recent server errors**. The container log remains the full record; this list exists so a failure is visible without server access and survives a container being replaced. If the database cannot be reached the record is dropped rather than slowing a request.
+
+Uploads: a file that fails is kept on the upload screen with its reason and a **Retry** button. A dropped connection to storage is retried automatically (3 attempts) before the file is reported as failed. The first such failure seen (2026-10-12, 1 of 7 files) was `SSLV3_ALERT_BAD_RECORD_MAC`, a garbled connection while uploading to Supabase Storage; it is most likely the shared connection being used by several threads at once, and the retry covers it. If it keeps happening, give storage uploads their own client.
+
 ## 3. Model cost and tokens
 
 Every call to Gemini or Google Translation is recorded in the `llm_usage` table: what it was for, tokens in and out, **estimated cost**, how long it took, and whether it worked or was rate-limited. No document text is stored.

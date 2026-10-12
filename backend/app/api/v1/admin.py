@@ -60,6 +60,31 @@ def get_usage(
             status_code=503,
         )
 
+@router.get("/errors")
+def get_recent_errors(
+    limit: int = Query(50, ge=1, le=200),
+    current_user: Dict[str, Any] = Depends(RoleRequirement(["Admin"])),
+    db: Client = Depends(get_supabase_service_client),
+):
+    """The most recent server errors (secrets removed): when, what, and which
+    user, case and document it was for. Admin only."""
+    try:
+        rows = (
+            db.table("app_errors")
+            .select("created_at,event,message,exception,request_id,user_id,case_id,document_id")
+            .order("created_at", desc=True)
+            .limit(limit)
+            .execute()
+            .data
+        )
+    except Exception as exc:
+        logger.warning("admin.errors_unavailable | reason=%s", safe_error(exc, 200))
+        raise PropertySystemException(
+            "The error list is not available yet. Apply migrations/0011_app_errors.sql to the database.",
+            status_code=503,
+        )
+    return {"errors": rows}
+
 @router.get("/users", response_model=List[UserResponse])
 def get_all_users(
     current_user: Dict[str, Any] = Depends(RoleRequirement(["Admin"])),

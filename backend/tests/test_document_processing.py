@@ -2,7 +2,7 @@ import asyncio
 
 import pytest
 
-from app.core.exceptions import PermissionDeniedError, ResourceNotFoundError
+from app.core.exceptions import PermissionDeniedError, PropertySystemException, ResourceNotFoundError
 from app.services.doc_service import DocumentService
 from app.services.pipeline_service import PipelineService
 from app.services.review_service import ReviewService
@@ -901,16 +901,21 @@ def test_storage_path_sanitises_file_name():
     assert document_storage_path("c", "d", "...") == "cases/c/d/document"
 
 
-def test_failed_storage_upload_removes_the_document_row():
+def test_failed_storage_upload_removes_the_document_row(monkeypatch):
     repo = _MultiDocRepo()
     deleted = []
     repo.client.table = lambda t: type("T", (), {"delete": lambda self: type("D", (), {
         "eq": lambda s, k, v: (deleted.append((t, k, v)) or s), "execute": lambda s: type("R", (), {"data": []})()})()})()
-    repo.objects["cases/case-1/doc-1/deed.pdf"] = b"already there"
     service = DocumentService(repo, FakeCaseRepo())
 
-    with pytest.raises(Exception):
+    def unreachable(*args, **kwargs):
+        raise ConnectionError("storage unreachable")
+
+    monkeypatch.setattr(service, "_store_with_retry", unreachable)
+
+    with pytest.raises(PropertySystemException) as error:
         service.upload_file("case-1", "deed.pdf", b"x", "application/pdf", {"id": "reviewer-1", "role": "Reviewer"})
+    assert "upload it again" in error.value.message  # a message a lawyer can act on
 
     assert deleted == [("documents", "id", "doc-1")]
 
@@ -920,3 +925,52 @@ def test_legacy_stored_path_is_still_used_for_reads():
     # file_path; the pipeline/review read paths use the stored value as-is.
     repo = FakeDocRepo({"id": "old-1", "case_id": "case-1", "file_path": "cases/case-1/old.pdf", "status": "llm_done"})
     assert repo.get_by_id("old-1")["file_path"] == "cases/case-1/old.pdf"
+
+
+
+# --- storage retries ---
+
+class _FlakyStorage:
+    """Fails the first `failures` uploads with `error`, then stores."""
+
+    def __init__(self, failures, error):
+        self.failures, self.error, self.calls = failures, error, 0
+
+    def from_(self, bucket):
+        return self
+
+    def upload(self, path, file, file_options):
+        self.calls += 1
+        if self.calls <= self.failures:
+            raise self.error
+        return {"path": path}
+
+
+def _service_with_storage(storage, monkeypatch):
+    import types
+
+    import app.services.doc_service as module
+
+    monkeypatch.setattr(module.time, "sleep", lambda seconds: None)
+    service = DocumentService.__new__(DocumentService)
+    service.doc_repo = types.SimpleNamespace(client=types.SimpleNamespace(storage=storage))
+    return service
+
+
+def test_a_dropped_connection_is_retried_and_then_succeeds(monkeypatch):
+    storage = _FlakyStorage(2, OSError("[SSL: SSLV3_ALERT_BAD_RECORD_MAC] bad record mac"))
+    _service_with_storage(storage, monkeypatch)._store_with_retry("cases/c/d/x.pdf", b"x", "application/pdf")
+    assert storage.calls == 3
+
+
+def test_gives_up_after_the_last_attempt_and_raises(monkeypatch):
+    storage = _FlakyStorage(99, OSError("connection reset"))
+    with pytest.raises(OSError):
+        _service_with_storage(storage, monkeypatch)._store_with_retry("cases/c/d/x.pdf", b"x", "application/pdf")
+    assert storage.calls == 3
+
+
+def test_a_lost_reply_is_not_an_error_when_the_object_is_already_there(monkeypatch):
+    storage = _FlakyStorage(1, Exception("The resource already exists (Duplicate)"))
+    _service_with_storage(storage, monkeypatch)._store_with_retry("cases/c/d/x.pdf", b"x", "application/pdf")
+    assert storage.calls == 1

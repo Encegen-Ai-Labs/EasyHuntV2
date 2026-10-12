@@ -7,7 +7,6 @@ from app.api.v1.cases import get_case_service
 from app.dependencies.auth import get_current_user
 from app.main import app
 from app.services.case_service import CaseService
-from app.services.report_pdf_builder import build_excerpt_report_pdf
 from app.services.report_service import ReportGenerationService
 
 CASE_ID = "22222222-2222-2222-2222-222222222222"
@@ -70,12 +69,6 @@ def test_get_case_with_null_survey_number_serialises_null():
 
     assert res.status_code == 200, res.text
     assert res.json()["survey_number"] is None
-
-
-@pytest.mark.parametrize("survey", [None, ""])
-def test_excerpt_pdf_builder_handles_missing_survey_number(survey):
-    case = {"id": "case-1", "property_name": "Plot 42", "location": "Pune", "survey_number": survey}
-    assert build_excerpt_report_pdf(case, []).startswith(b"%PDF")
 
 
 @pytest.mark.parametrize("survey", [None, ""])

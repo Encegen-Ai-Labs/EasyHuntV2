@@ -34,7 +34,3 @@ class ReportBuilderResponse(BaseModel):
     case_id: UUID
     status: str
     excerpts: List[ExcerptResponse]
-
-class ReportExportResponse(BaseModel):
-    file_path: str
-    download_url: str

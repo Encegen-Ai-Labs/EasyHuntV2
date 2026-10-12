@@ -2,16 +2,6 @@
 
 Things deliberately not done yet, each with enough context to pick up later. Not a commitment or a priority order. Move an item into ROADMAP.md (and DECISIONS.md if it needs a decision) when it is scheduled.
 
-## Revisit when we design the export step
-
-### Stream the report PDF through the API instead of a signed URL
-
-Today `POST /cases/{id}/report-builder/export` uploads the PDF to Supabase Storage and returns a signed URL that the browser opens in a new tab, so a bearer token for the file ends up in the address bar and browser history.
-
-Intern PR #27 (commit `963e415`) changed this: the service returns the PDF bytes, the endpoint streams them with `Content-Disposition: attachment`, `Cache-Control: private, no-store` and `X-Content-Type-Options: nosniff`, and the frontend downloads a Blob. The code is sound and its tests passed, but it also changes the API contract (JSON to binary, `ReportExportResponse` removed) and was not part of the requested work, so it was left out of the merge.
-
-To revisit: take it when the export step is designed, as its own change, together with any bank-template export format. Files in that commit: `backend/app/api/v1/report_builder.py`, `backend/app/services/report_builder_service.py`, `backend/app/schemas/report_builder.py`, `backend/tests/test_report_builder_service.py`, `Frontend/src/components/screens/ReportBuilderPage.tsx`, and the export parts of `Frontend/src/services/api/client.ts`. Signed URLs already issued stay valid until they expire; streaming does not revoke them.
-
 ## Waiting on information
 
 - **Survey number removal.** The case form still asks for a survey number. Plan: make `cases.survey_number` nullable and store `null`, not `""`; make `CaseResponse.survey_number` optional; drop or fill from extractions the "Survey Number" rows in `report_pdf_builder.py` and `report_service.py`. Nothing in chain, risk or pipeline checks reads the case-level value. Blocked on checking the Supabase column's `NOT NULL`/`UNIQUE` constraints.
@@ -21,7 +11,6 @@ To revisit: take it when the export step is designed, as its own change, togethe
 ## Cleanup found during the PR #27 review
 
 - The dashboard fabricates values: `normalizeCase` in `Frontend/src/services/api/client.ts` defaults `risk` to "Medium", `priority` to "High", `confidence` to 85 and the assignee to "System Reviewer", because the backend sends none of them. The Risk column is therefore fiction. Remove the columns or compute real values.
-- `Frontend/src/components/screens/FullCaseDashboard.tsx` is imported nowhere and still has hard-coded KPIs. Delete it (D6).
 - "Flagged" means two things: a document status (`flagged`, shown in the documents list) and case-level `risk_flags` rows (`RiskFlagsPanel`). Consider relabelling the document status (the review toast already says "flagged for correction").
 - Upload page runs two pollers (the batch panel every 4 s and the documents list every 3 s). One source would do. A document stuck in `processing` is polled forever.
 - Admin can only create Reviewer accounts (`POST /admin/reviewers` pins the role). Creating other admins or roles is new work. The create response also echoes the plaintext password back.
@@ -59,7 +48,6 @@ Found while writing the production plan; the plan schedules them, this list keep
 - **Verify bank PDF export in the Docker image** (LibreOffice was added to the Dockerfile but never built or run). Also check Marathi text renders in a converted PDF.
 - **Bank prefill depends on what the documents say.** A Gemini call fills the factual fields (D10 addendum); fields the documents do not state stay empty. Judge quality on fuller documents (sale deed, 7/12) than the short extracts tried so far.
 - **Upload your own bank format** (UI placeholder only).
-- **Delete `Frontend/src/components/search/CaseSearchPanel.tsx`** (no longer used; superseded by the Search & select page). The old `POST .../report-builder/export` endpoint and `report_pdf_builder.build_excerpt_report_pdf` are also unused by the UI now.
 - The "two pollers on the upload page" item above is fixed: the upload panel no longer polls.
 
 ## From the production-safety pass (D11)

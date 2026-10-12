@@ -570,39 +570,6 @@ export const apiClient = {
     },
   },
 
-  reports: {
-    generate: async (caseId: string) => {
-      try {
-        const res = await fetch(`${API_BASE_URL}/reports/generate/${caseId}`, {
-          method: "POST",
-          headers: getAuthHeaders({ "Content-Type": "application/json" }),
-        });
-        if (!res.ok) {
-          const errData = await res.json().catch(() => ({}));
-          throw new Error(errData.detail || `Report generation failed`);
-        }
-        return { success: true, data: await res.json() };
-      } catch (err: any) {
-        return { success: false, error: err.message };
-      }
-    },
-
-    download: async (caseId: string) => {
-      try {
-        const res = await fetch(`${API_BASE_URL}/reports/download/${caseId}`, {
-          headers: getAuthHeaders({ "Content-Type": "application/json" }),
-        });
-        if (!res.ok) {
-          const errData = await res.json().catch(() => ({}));
-          throw new Error(errData.detail || `Download failed`);
-        }
-        return { success: true, data: await res.json() };
-      } catch (err: any) {
-        return { success: false, error: err.message };
-      }
-    },
-  },
-
   flags: {
     list: async (caseId?: string): Promise<{ success: boolean; data?: FlagRecord[]; error?: string }> => {
       try {

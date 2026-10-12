@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, status
 from typing import List, Dict, Any
-from app.schemas.cases import CaseCreate, CaseResponse, CaseUpdate
+from app.schemas.cases import CaseCreate, CaseResponse
 from app.services.case_service import CaseService
 from app.services.pipeline_service import PipelineService
 from app.repositories.case_repo import CaseRepository

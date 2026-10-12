@@ -24,7 +24,6 @@ from app.services.extraction_cache import (
 )
 from app.services.image_enhancement import enhance_page_image_with_report
 from app.services.document_router import route_and_extract_page
-from app.services.embedding_service import embed_pages
 from app.core.redaction import safe_error
 
 # Batch upload (up to 20 files/case) can queue up to 20 background extraction
@@ -507,14 +506,6 @@ class PipelineService:
         # telemetry (source, confidence, issues) that's already been logged
         # above, not persisted.
         page_rows = [{"page_number": p["page_number"], "original_text": p["original_text"]} for p in routed_pages]
-
-        # Semantic search needs a vector per page — generated here (unlike
-        # translation, this isn't optional/on-demand, since search should
-        # just work without an extra manual step). A page whose embedding call
-        # fails still gets indexed for exact-match search (embed_pages sets
-        # embedding=None for it rather than dropping the page) — see
-        # embedding_service.py.
-        page_rows = embed_pages(page_rows)
 
         # Isolated in its own try/except (the comment above always intended
         # this — search/page-view being unavailable for a document shouldn't

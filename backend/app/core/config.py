@@ -50,14 +50,6 @@ class Settings(BaseSettings):
         default=30, validation_alias="CELERY_RATE_LIMIT_BACKOFF_SECONDS"
     )
 
-    # ---- Search ----
-    # Similar-meaning search returns the closest pages by embedding distance no
-    # matter how weak the match, so drop pages below this cosine similarity.
-    # Deliberately permissive until it can be calibrated on real case data
-    # (including Marathi/Hindi pages); the UI shows each match's similarity so a
-    # reviewer can judge weak ones. Raise it if the "Similar" section is noisy.
-    SEARCH_MIN_SIMILARITY: float = Field(default=0.30, validation_alias="SEARCH_MIN_SIMILARITY")
-
     # ---- Extraction cache (app/services/extraction_cache.py) ----
     # Reuse the stored extraction when the exact same file (same bytes) was already
     # extracted with the same model and pipeline version. OFF by default: it needs

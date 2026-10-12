@@ -9,7 +9,6 @@ from app.repositories.case_repo import CaseRepository
 from app.repositories.flag_repo import FlagRepository
 from app.repositories.document_page_repo import DocumentPageRepository
 from app.services.translation_service import translate_pages
-from app.services.embedding_service import embed_text
 from app.core.logging import logger
 from app.repositories.base import BaseRepository
 from app.services.corrections_service import CorrectionRecorder
@@ -18,7 +17,7 @@ from app.dependencies.auth import RoleRequirement
 from app.core.exceptions import PropertySystemException, ResourceNotFoundError
 from supabase import Client
 from typing import Any, Dict, List
-from app.core.rate_limiting import limit_ip, limit_user
+from app.core.rate_limiting import limit_user
 from app.services.llm_usage import ensure_within_budget
 
 router = APIRouter(prefix="/documents", tags=["Document Infrastructure"])
@@ -213,13 +212,7 @@ def update_document_page(
     columns search, translation, and the report builder's excerpts all read
     from — so a correction here propagates everywhere else that page's text
     is used, not just this screen.
-
-    Editing original_text also regenerates that page's search embedding
-    synchronously (one extra Gemini call per save) so semantic search
-    doesn't keep ranking the page against its pre-edit text. If the
-    re-embed call itself fails, the text edit is still saved — the old
-    embedding is left in place (slightly stale) rather than being nulled
-    out, which would silently drop the page from semantic search entirely."""
+"""
     document = service.doc_repo.get_by_id(id)
     if not document:
         raise ResourceNotFoundError("Document not found")
@@ -231,14 +224,6 @@ def update_document_page(
     update_data: Dict[str, Any] = {}
     if payload.original_text is not None:
         update_data["original_text"] = payload.original_text
-        embed_result = embed_text(payload.original_text)
-        if embed_result["success"]:
-            update_data["embedding"] = embed_result["embedding"]
-        else:
-            logger.error(
-                "documents.page_edit_reembed_failed | document_id=%s page_number=%s error=%s",
-                id, page_number, embed_result["error"],
-            )
     if payload.english_text is not None:
         update_data["english_text"] = payload.english_text
 

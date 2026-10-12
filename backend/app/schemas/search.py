@@ -1,16 +1,6 @@
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import List
 from uuid import UUID
-
-class SearchResult(BaseModel):
-    document_id: UUID
-    document_name: Optional[str] = None
-    page_number: int
-    matched_in: str  # "original" | "english" (exact mode) | "semantic" (semantic mode)
-    snippet: str
-    # Only set in semantic mode (0..1, higher = more relevant) — exact mode
-    # has no ranking score, a substring either matched or it didn't.
-    similarity: Optional[float] = None
 
 class TermLocation(BaseModel):
     document_id: UUID
@@ -28,12 +18,3 @@ class TermsResponse(BaseModel):
     terms: List[SearchTerm]
     # Approved documents with no English text yet; English words cannot match them until translated.
     untranslated_document_ids: List[UUID] = []
-
-class SearchResponse(BaseModel):
-    query: str
-    mode: str = "exact"
-    results: List[SearchResult]
-    # Semantic mode only: True when the similar-meaning part could not run
-    # (query embedding failed, or the embedding column/RPC isn't available).
-    # `results` then holds the exact matches alone.
-    similar_unavailable: bool = False

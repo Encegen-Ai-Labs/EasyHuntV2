@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 from app.core.config import settings
 from app.core.logging import logger
 from app.core.redaction import redact, safe_error
-from app.services.llm_usage import TRANSLATE_GOOGLE, LlmCall
+from app.services.llm_usage import TRANSLATE_GOOGLE, LlmCall, generate_tracked
 from app.services.page_extraction_service import strip_annotation_tags
 from app.services.text_cleanup import clean_page_text
 
@@ -85,18 +85,17 @@ def _translate_gemini(text: str) -> Dict[str, Any]:
     try:
         from google.genai import types
 
-        from app.services.llm_extractor import GEMINI_MODEL, client_genai
+        from app.services.llm_extractor import GEMINI_MODEL
 
-        with LlmCall("translation", GEMINI_MODEL) as call:
-            response = client_genai.models.generate_content(
-                model=GEMINI_MODEL,
-                contents=[GEMINI_TRANSLATE_PROMPT + text],
-                config=types.GenerateContentConfig(
-                    temperature=0.0,
-                    http_options=types.HttpOptions(timeout=60_000, retry_options=types.HttpRetryOptions(attempts=3)),
-                ),
-            )
-            call.response = response
+        response = generate_tracked(
+            "translation",
+            model=GEMINI_MODEL,
+            contents=[GEMINI_TRANSLATE_PROMPT + text],
+            config=types.GenerateContentConfig(
+                temperature=0.0,
+                http_options=types.HttpOptions(timeout=60_000, retry_options=types.HttpRetryOptions(attempts=3)),
+            ),
+        )
         translated = clean_page_text((response.text or "").strip())
         return {"success": True, "translated_text": translated, "error": None, "provider": "gemini"}
     except Exception as e:

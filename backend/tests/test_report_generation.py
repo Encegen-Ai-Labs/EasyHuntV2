@@ -319,3 +319,12 @@ def test_clean_answer_drops_non_answers_like_nil():
 
     fields = [{"name": "docs", "type": "text"}, {"name": "village", "type": "text"}]
     assert clean_answer({"fields": {"docs": "Nil", "village": "N/A"}}, fields, []) == {"fields": {}, "loops": {}}
+
+
+@pytest.mark.parametrize("survey", [None, ""])
+def test_a_report_can_be_drafted_for_a_case_with_no_survey_number(survey, monkeypatch):
+    case = {**CASE, "survey_number": survey}
+    service = _service()
+    service.doc_service.authorize_case_access = lambda case_id, user: case
+    draft = service.build_draft("case-1", "title-search", USER)
+    assert draft.sections and draft.title == "Title Search Report"

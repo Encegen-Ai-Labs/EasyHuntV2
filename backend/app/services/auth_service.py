@@ -1,4 +1,4 @@
-from typing import Dict, Any, List
+from typing import Dict, Any
 from app.repositories.user_repo import UserRepository
 from app.core.security import get_password_hash, verify_password, create_access_token
 from app.core.exceptions import AuthenticationError, PropertySystemException

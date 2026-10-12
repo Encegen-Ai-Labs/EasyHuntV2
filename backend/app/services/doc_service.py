@@ -1,3 +1,4 @@
+import time
 import mimetypes
 import re
 from typing import Dict, Any
@@ -6,8 +7,11 @@ from app.repositories.case_repo import CaseRepository
 from app.repositories.base import BaseRepository
 from app.core.exceptions import ResourceNotFoundError, PermissionDeniedError, PropertySystemException
 from app.core.logging import logger
+from app.core.redaction import safe_error
 from datetime import datetime, timezone
 ALLOWED_MIMETYPES = ["application/pdf", "image/png", "image/jpeg", "image/jpg"]
+STORAGE_ATTEMPTS = 3
+STORAGE_RETRY_PAUSE_SECONDS = 0.5
 MAX_FILE_SIZE = 10 * 1024 * 1024  # 10 MB
 STORAGE_BUCKET = "documents"
 
@@ -88,20 +92,38 @@ class DocumentService:
 
         # No x-upsert: an existing object at this path is an error, never overwritten.
         try:
-            self.doc_repo.client.storage.from_(STORAGE_BUCKET).upload(
-                path=storage_path,
-                file=file_bytes,
-                file_options={"content-type": mime_type}
-            )
+            self._store_with_retry(storage_path, file_bytes, mime_type)
             updated = self.doc_repo.update_file_path(document["id"], storage_path)
         except Exception as e:
-            logger.error("doc_service.upload_failed | document_id=%s error=%s", document["id"], e)
+            logger.error("doc_service.upload_failed | document_id=%s error=%s", document["id"], safe_error(e))
             try:
                 BaseRepository(self.doc_repo.client).delete("documents", {"id": document["id"]})
             except Exception:
                 logger.exception("doc_service.upload_cleanup_failed | document_id=%s", document["id"])
-            raise PropertySystemException("Failed to store the uploaded file")
+            raise PropertySystemException(
+                "The file could not be saved because the storage service did not respond reliably. Please upload it again."
+            )
         return updated or {**document, "file_path": storage_path}
+
+    def _store_with_retry(self, storage_path: str, file_bytes: bytes, mime_type: str) -> None:
+        """Uploads to storage, retrying a dropped or garbled connection (an
+        occasional TLS or network error) a couple of times before giving up."""
+        for attempt in range(1, STORAGE_ATTEMPTS + 1):
+            try:
+                self.doc_repo.client.storage.from_(STORAGE_BUCKET).upload(
+                    path=storage_path, file=file_bytes, file_options={"content-type": mime_type}
+                )
+                return
+            except Exception as exc:
+                text = str(exc).lower()
+                if "duplicate" in text or "already exists" in text:
+                    return  # an earlier attempt did store it; only its reply was lost
+                if attempt == STORAGE_ATTEMPTS:
+                    raise
+                logger.warning(
+                    "doc_service.upload_retry | attempt=%s reason=%s", attempt, safe_error(exc, 120)
+                )
+                time.sleep(STORAGE_RETRY_PAUSE_SECONDS * attempt)
 
     def validate_and_upload(
         self,

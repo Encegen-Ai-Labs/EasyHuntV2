@@ -65,6 +65,10 @@ def setup_logging():
         handler.setFormatter(RedactingTextFormatter("%(asctime)s [%(levelname)s] %(name)s: %(message)s"))
     root = logging.getLogger()
     root.handlers = [handler]
+    if os.environ.get("ERROR_STORE_ENABLED", "true").lower() == "true":
+        from app.core.error_store import ErrorStoreHandler
+
+        root.addHandler(ErrorStoreHandler())
     root.setLevel(logging.INFO)
     # httpx logs every request URL at INFO; our URLs carry no secrets any more,
     # but there is no reason to log every Supabase call either.

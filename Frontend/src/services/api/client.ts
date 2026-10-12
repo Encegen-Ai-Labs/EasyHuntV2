@@ -133,6 +133,17 @@ export interface UsageSummary {
   recent_failures: { created_at: string; kind: string; status: string; error: string | null }[];
 }
 
+export interface AppError {
+  created_at: string;
+  event: string | null;
+  message: string;
+  exception: string | null;
+  request_id: string | null;
+  user_id: string | null;
+  case_id: string | null;
+  document_id: string | null;
+}
+
 export interface ReportFormat {
   id: string;
   kind: "title_search" | "bank";
@@ -773,6 +784,18 @@ export const apiClient = {
         throw new Error(errData.detail || `Failed to load users (${res.status})`);
       }
       return res.json();
+    },
+
+    getErrors: async (): Promise<{ success: boolean; data?: AppError[]; error?: string }> => {
+      try {
+        const res = await fetch(`${API_BASE_URL}/admin/errors?limit=50`, {
+          headers: getAuthHeaders({ "Content-Type": "application/json" }),
+        });
+        if (!res.ok) throw new Error(await errorMessage(res, "Could not load errors"));
+        return { success: true, data: (await res.json()).errors };
+      } catch (err: any) {
+        return { success: false, error: err.message };
+      }
     },
 
     getUsage: async (days: number): Promise<{ success: boolean; data?: UsageSummary; error?: string }> => {

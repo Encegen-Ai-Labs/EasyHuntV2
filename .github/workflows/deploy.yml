@@ -1,0 +1,87 @@
+# Builds the backend image and, when a server is configured, deploys it.
+#   push to dev  -> builds, then deploys to "staging"
+#   push to main -> builds, then deploys to "production" (waits for a human to approve)
+# Nothing is deployed until the repository variable DEPLOY_HOST exists for that environment,
+# so this file is safe to merge before any server is set up: it just builds and publishes the image.
+# See docs/CICD.md for the one-time setup.
+name: Deploy
+
+on:
+  push:
+    branches: [dev, main]
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  packages: write   # to publish the image to GitHub's container registry (ghcr.io)
+
+concurrency:
+  group: deploy-${{ github.ref_name }}
+  cancel-in-progress: false   # never abort a deploy half way
+
+env:
+  IMAGE: ghcr.io/${{ github.repository_owner }}/easyhunt-backend
+
+jobs:
+  image:
+    name: Build and publish image
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    outputs:
+      tag: ${{ steps.meta.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: meta
+        run: echo "tag=${GITHUB_SHA::12}" >> "$GITHUB_OUTPUT"
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: backend
+          push: true
+          # The commit id is the version. Deploys and rollbacks always name a commit, never "latest".
+          tags: |
+            ${{ env.IMAGE }}:${{ steps.meta.outputs.tag }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy:
+    name: Deploy to ${{ github.ref_name == 'main' && 'production' || 'staging' }}
+    needs: image
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # "production" is configured in GitHub with required reviewers: this job pauses until one approves.
+    environment: ${{ github.ref_name == 'main' && 'production' || 'staging' }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Is a server configured?
+        id: gate
+        env:
+          DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}
+        run: |
+          if [ -z "$DEPLOY_HOST" ]; then
+            echo "No DEPLOY_HOST set for this environment: image published, nothing deployed."
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Deploy over SSH
+        if: steps.gate.outputs.run == 'true'
+        env:
+          DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ vars.DEPLOY_USER }}
+          DEPLOY_PATH: ${{ vars.DEPLOY_PATH }}
+          SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          KNOWN_HOSTS: ${{ vars.DEPLOY_KNOWN_HOSTS }}
+          TAG: ${{ needs.image.outputs.tag }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key && chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          # Copy the small deploy script and compose file, then run the script on the server.
+          scp -i ~/.ssh/deploy_key deploy/deploy.sh docker-compose.yml docker-compose.prod.yml "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/"
+          ssh -i ~/.ssh/deploy_key "$DEPLOY_USER@$DEPLOY_HOST" "cd '$DEPLOY_PATH' && IMAGE='${{ env.IMAGE }}' sh deploy.sh '$TAG'"

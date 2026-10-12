@@ -89,12 +89,64 @@ class Settings(BaseSettings):
     # changing this setting alone doesn't install them.
     TESSERACT_LANGUAGES: str = Field(default="eng+hin+mar+tam+tel+kan", validation_alias="TESSERACT_LANGUAGES")
 
+    # ---- Environment and safety ----
+    # "development" (default), "staging" or "production". Production refuses to
+    # start on placeholder secrets (see app/core/startup_checks.py) and logs JSON.
+    APP_ENV: str = Field(default="development", validation_alias="APP_ENV")
+    # Secret that signs this app's own login tokens. When unset the Supabase JWT
+    # secret is used (the old behaviour), but a separate value is safer: the
+    # Supabase secret also grants access to the database API.
+    APP_JWT_SECRET: str = Field(default="", validation_alias="APP_JWT_SECRET")
+    # Error tracking. Empty = off. Request bodies, headers and document text are
+    # never sent (see app/core/observability.py).
+    SENTRY_DSN: str = Field(default="", validation_alias="SENTRY_DSN")
+
+    # ---- Rate limiting (app/core/rate_limiting.py) ----
+    # Only true behind a reverse proxy you control: then the client address is
+    # taken from X-Forwarded-For. Otherwise that header is attacker-controlled.
+    TRUST_PROXY: bool = Field(default=False, validation_alias="TRUST_PROXY")
+    RATE_LIMIT_ENABLED: bool = Field(default=True, validation_alias="RATE_LIMIT_ENABLED")
+    # "memory://" works for one process; docker-compose points it at Redis so the
+    # limits are shared by every API process.
+    RATE_LIMIT_STORAGE_URL: str = Field(default="memory://", validation_alias="RATE_LIMIT_STORAGE_URL")
+    RATE_LIMIT_LOGIN: str = Field(default="10/minute", validation_alias="RATE_LIMIT_LOGIN")
+    RATE_LIMIT_UPLOAD: str = Field(default="20/minute", validation_alias="RATE_LIMIT_UPLOAD")
+    # Calls that spend money (translation, report drafting) are limited per user.
+    RATE_LIMIT_PAID_CALLS: str = Field(default="20/minute", validation_alias="RATE_LIMIT_PAID_CALLS")
+    RATE_LIMIT_DEFAULT: str = Field(default="300/minute", validation_alias="RATE_LIMIT_DEFAULT")
+
+    # ---- LLM usage and cost (app/services/llm_usage.py) ----
+    # ESTIMATES in US dollars per million tokens (per million characters for
+    # Cloud Translation). Check them against Google's current price list for the
+    # model in use and override here; the dashboard labels cost as an estimate.
+    LLM_PRICE_INPUT_PER_M: float = Field(default=0.10, validation_alias="LLM_PRICE_INPUT_PER_M")
+    LLM_PRICE_OUTPUT_PER_M: float = Field(default=0.40, validation_alias="LLM_PRICE_OUTPUT_PER_M")
+    LLM_PRICE_EMBEDDING_PER_M: float = Field(default=0.15, validation_alias="LLM_PRICE_EMBEDDING_PER_M")
+    TRANSLATE_PRICE_PER_M_CHARS: float = Field(default=20.0, validation_alias="TRANSLATE_PRICE_PER_M_CHARS")
+    # When today's estimated spend reaches this, new uploads, translations and
+    # report drafts are refused with a clear message (work already running
+    # finishes). 0 turns the guard off.
+    DAILY_LLM_BUDGET_USD: float = Field(default=0.0, validation_alias="DAILY_LLM_BUDGET_USD")
+
+    # ---- Translation (app/services/translation_service.py) ----
+    # "auto": Google Cloud Translation when GOOGLE_TRANSLATE_API_KEY works, else
+    # Gemini. "google" or "gemini" force one.
+    TRANSLATION_PROVIDER: str = Field(default="auto", validation_alias="TRANSLATION_PROVIDER")
+
     model_config = SettingsConfigDict(
         env_file=str(ENV_FILE),
         env_file_encoding="utf-8",
         extra="ignore",
         case_sensitive=False,
     )
+
+    @property
+    def is_production(self) -> bool:
+        return self.APP_ENV.lower() == "production"
+
+    @property
+    def jwt_signing_secret(self) -> str:
+        return self.APP_JWT_SECRET or self.SUPABASE_JWT_SECRET
 
     @property
     def cors_origin_list(self) -> list[str]:

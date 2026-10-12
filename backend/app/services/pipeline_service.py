@@ -1,7 +1,9 @@
 import asyncio
+import contextvars
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Dict, Any, List, Optional
+from app.core import context
 from app.core.logging import logger
 from app.repositories.doc_repo import DocumentRepository
 from app.repositories.case_repo import CaseRepository
@@ -23,6 +25,7 @@ from app.services.extraction_cache import (
 from app.services.image_enhancement import enhance_page_image_with_report
 from app.services.document_router import route_and_extract_page
 from app.services.embedding_service import embed_pages
+from app.core.redaction import safe_error
 
 # Batch upload (up to 20 files/case) can queue up to 20 background extraction
 # runs from a single request. FastAPI's BackgroundTasks would otherwise run these
@@ -225,11 +228,15 @@ class PipelineService:
             }
 
         pipeline_started = time.monotonic()
+        # Every log line and model-usage row from this document carries its id.
+        context.bind(document_id=doc_id)
         logger.info("pipeline.document_started | document_id=%s", doc_id)
 
         # Transition document status to processing
         self.doc_repo.update_status(doc_id, "processing")
         doc = self.doc_repo.get_by_id(doc_id)
+        if doc:
+            context.bind(case_id=doc.get("case_id"))
         if not doc:
             logger.error("pipeline.document_not_found | document_id=%s", doc_id)
             return {
@@ -268,7 +275,7 @@ class PipelineService:
                 "status": "failed",
                 "case_id": case_id,
                 "document_id": doc_id,
-                "error": f"Failed to rasterize document: {e}"
+                "error": f"Failed to rasterize document: {safe_error(e)}"
             }
 
         logger.info("pipeline.rasterized | document_id=%s pages=%s", doc_id, len(page_images))
@@ -310,7 +317,10 @@ class PipelineService:
         worker_count = min(MAX_CONCURRENT_PAGES_PER_DOCUMENT, len(page_images)) or 1
         with ThreadPoolExecutor(max_workers=worker_count) as executor:
             future_to_index = {
+                # A copy of the current context per page, so the worker threads
+                # log and record usage under this document and case.
                 executor.submit(
+                    contextvars.copy_context().run,
                     self._process_page, case_id, doc_id, index, page_image,
                     combine_single_page_extraction,
                     cache_entry["routed_pages"][index] if cache_entry else None,
@@ -332,11 +342,11 @@ class PipelineService:
                     )
                     routed_pages[index] = {
                         "page_number": index + 1,
-                        "original_text": f"[page processing failed: {e}]",
+                        "original_text": f"[page processing failed: {safe_error(e)}]",
                         "source": "error",
                         "confidence": 0.0,
                         "has_handwriting": False,
-                        "issues": [f"unhandled_exception: {e}"],
+                        "issues": [f"unhandled_exception: {safe_error(e)}"],
                         "structured_fields": None,
                     }
 
@@ -477,7 +487,7 @@ class PipelineService:
                 "status": "failed",
                 "case_id": case_id,
                 "document_id": doc_id,
-                "error": str(e)
+                "error": safe_error(e)
             }
 
         # Route based on validation instead of always going to under_review

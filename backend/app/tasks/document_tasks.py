@@ -2,6 +2,7 @@ import random
 from typing import Any, Dict
 
 from app.core.config import settings
+from app.core import context
 from app.core.logging import logger
 from app.dependencies.db import get_supabase_service_client
 from app.repositories.case_repo import CaseRepository
@@ -46,6 +47,8 @@ def process_document_task(self: Any, document_id: str, force_refresh: bool = Fal
     uses (PipelineService.execute_analysis_pipeline, as called per document by
     execute_batch); worker concurrency replaces execute_batch's semaphore."""
     service = None
+    # A worker process reuses its context between tasks: start each one clean.
+    context.bind(request_id=f"task-{self.request.id}", document_id=document_id, case_id=None, user_id=None)
     try:
         service = _pipeline_service()
         if force_refresh:

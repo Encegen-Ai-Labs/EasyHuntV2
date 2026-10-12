@@ -1,0 +1,2 @@
+# Shell scripts run on Linux servers: they must never be checked out with Windows line endings.
+*.sh text eol=lf

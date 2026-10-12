@@ -9,6 +9,8 @@ from google.genai import types
 
 from app.services.llm_extractor import GEMINI_MODEL, client_genai, _clean_json_response
 from app.services.rate_limit import is_rate_limit_error
+from app.services.llm_usage import generate_tracked
+from app.core.redaction import safe_error
 
 # 2026-08-21: replaced the older, narrower verbatim-only prompt with a more
 # detailed "forensic extraction" prompt (user-supplied, evaluated against the
@@ -118,7 +120,7 @@ def extract_page_text(image_bytes: bytes, mime_type: str = "image/png") -> Dict[
     narrow prompt, plain text (not JSON), no structured fields, so one page's
     failure can't corrupt another page's result."""
     try:
-        response = client_genai.models.generate_content(
+        response = generate_tracked("page_transcription", 
             model=GEMINI_MODEL,
             contents=[
                 types.Part.from_bytes(data=image_bytes, mime_type=mime_type),
@@ -134,7 +136,7 @@ def extract_page_text(image_bytes: bytes, mime_type: str = "image/png") -> Dict[
         )
         return {"success": True, "text": response.text.strip(), "error": None}
     except Exception as e:
-        return {"success": False, "text": None, "error": str(e), "rate_limited": is_rate_limit_error(e)}
+        return {"success": False, "text": None, "error": safe_error(e), "rate_limited": is_rate_limit_error(e)}
 
 
 # Delimiter separating the verbatim transcription from the structured-fields
@@ -215,7 +217,7 @@ def extract_page_text_and_fields(image_bytes: bytes, mime_type: str = "image/png
     reshaping it first.
     """
     try:
-        response = client_genai.models.generate_content(
+        response = generate_tracked("page_transcription_and_fields", 
             model=GEMINI_MODEL,
             contents=[
                 types.Part.from_bytes(data=image_bytes, mime_type=mime_type),
@@ -254,7 +256,7 @@ def extract_page_text_and_fields(image_bytes: bytes, mime_type: str = "image/png
     except Exception as e:
         return {
             "success": False, "text": None, "extracted": None, "model_used": GEMINI_MODEL,
-            "error": str(e), "rate_limited": is_rate_limit_error(e),
+            "error": safe_error(e), "rate_limited": is_rate_limit_error(e),
         }
 
 

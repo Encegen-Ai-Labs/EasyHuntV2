@@ -16,6 +16,7 @@ from app.core.config import settings
 from app.ocr.factory import get_ocr_provider
 from app.services.page_extraction_service import extract_page_text, extract_page_text_and_fields
 from app.services.text_cleanup import clean_page_text
+from app.core.redaction import redact
 
 
 def _analyze_page(image_bytes: bytes) -> Dict[str, Any]:
@@ -105,10 +106,10 @@ def route_and_extract_page(
         vlm_result = extract_page_text(image_bytes, mime_type="image/png")
 
     if not vlm_result["success"]:
-        issues.append(f"vlm_error: {vlm_result['error']}")
+        issues.append(f"vlm_error: {redact(vlm_result['error'])}")
         return {
             "page_number": page_number,
-            "original_text": f"[page extraction failed: {vlm_result['error']}]",
+            "original_text": f"[page extraction failed: {redact(vlm_result['error'])}]",
             "source": "vlm",
             "confidence": 0.0,
             "has_handwriting": analysis["handwritten_ratio"] > 0,

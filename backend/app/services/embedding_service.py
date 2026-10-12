@@ -17,6 +17,8 @@ from typing import Any, Dict, List, Optional
 from google.genai import types
 
 from app.services.llm_extractor import client_genai
+from app.services.llm_usage import embed_tracked
+from app.core.redaction import safe_error
 
 EMBEDDING_MODEL = "gemini-embedding-001"
 EMBEDDING_DIMENSIONS = 768
@@ -36,7 +38,7 @@ def embed_text(text: str, task_type: str = "RETRIEVAL_DOCUMENT") -> Dict[str, An
         return {"success": True, "embedding": None, "error": None}
 
     try:
-        response = client_genai.models.embed_content(
+        response = embed_tracked(
             model=EMBEDDING_MODEL,
             contents=text,
             config=types.EmbedContentConfig(
@@ -47,7 +49,7 @@ def embed_text(text: str, task_type: str = "RETRIEVAL_DOCUMENT") -> Dict[str, An
         values = response.embeddings[0].values if response.embeddings else None
         return {"success": True, "embedding": values, "error": None}
     except Exception as e:
-        return {"success": False, "embedding": None, "error": str(e)}
+        return {"success": False, "embedding": None, "error": safe_error(e)}
 
 
 def embed_pages(pages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:

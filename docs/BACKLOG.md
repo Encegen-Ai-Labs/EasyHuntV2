@@ -61,3 +61,16 @@ Found while writing the production plan; the plan schedules them, this list keep
 - **Upload your own bank format** (UI placeholder only).
 - **Delete `Frontend/src/components/search/CaseSearchPanel.tsx`** (no longer used; superseded by the Search & select page). The old `POST .../report-builder/export` endpoint and `report_pdf_builder.build_excerpt_report_pdf` are also unused by the UI now.
 - The "two pollers on the upload page" item above is fixed: the upload panel no longer polls.
+
+## From the production-safety pass (D11)
+
+- **Rotate the Translation API key.** It was shown on screen and stored in one page's text (scrubbed on 2026-10-12), so treat it as exposed. Create a Cloud Translation key if Google Translation is wanted; otherwise leave `GOOGLE_TRANSLATE_API_KEY` empty and translation runs on Gemini.
+- **Check the price settings** (`LLM_PRICE_*`) against Google's price list for the model in use, and set `DAILY_LLM_BUDGET_USD` and a Google Cloud billing budget alert.
+- **Set `SENTRY_DSN`** and an uptime monitor on `/health/ready`; set a real `APP_JWT_SECRET` (changing it signs everyone out once).
+- **ESLint reports 7 errors** (the React `set-state-in-effect` rule, in ThemeToggle, AuthContext, UserManagementPage, ReportBuilderPage, CaseSearchPage, UsagePage). CI shows lint as report-only until they are fixed; then make it blocking.
+- **Add ruff configuration** for the backend, then make the lint step blocking.
+- **Login token in `localStorage`.** Move to an httpOnly cookie. Add a Content-Security-Policy once the production addresses are known.
+- **Migrations are applied by hand.** Needs the base schema in the repo before a CI migration check or automatic migration step (see PRODUCTION_PLAN section 5).
+- **Supabase advisor warnings:** set a fixed `search_path` on `match_document_pages` and `extraction_corrections_no_update`; move the `vector` extension out of `public`.
+- **Server set-up for CD** (staging and production hosts, deploy keys, branch protection): steps in CICD.md.
+- **Frontend error tracking** (`@sentry/nextjs`) is not added; only the backend reports to Sentry.

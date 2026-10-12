@@ -2,6 +2,8 @@ from google import genai
 from typing import Dict, Any, List
 import os
 from dotenv import load_dotenv
+from app.services.llm_usage import generate_tracked
+from app.core.redaction import safe_error
 
 load_dotenv()
 
@@ -46,7 +48,7 @@ def generate_draft_report(
             flags_summary=flags_summary
         )
 
-        response = client_genai.models.generate_content(
+        response = generate_tracked("report_draft", 
             model="gemini-3.5-flash-lite",
             contents=[prompt]
         )
@@ -61,5 +63,5 @@ def generate_draft_report(
         return {
             "success": False,
             "draft_text": None,
-            "error": str(e)
+            "error": safe_error(e)
         }

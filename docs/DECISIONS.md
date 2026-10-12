@@ -130,3 +130,17 @@ The lawyer flow is now Upload → Review & approve each document → Search & se
 - The api and worker run in Docker: after backend changes, `docker compose up -d --build api worker` is needed or the new endpoints return 404.
 
 **D10 addendum (visual pass):** the first indigo/gradient styling read as generic, so the look was redone: warm paper neutrals, deep ink, one muted verdigris accent; Newsreader (serif) for titles, Inter for everything read or filled in; flat hairline cards; a plain title instead of a banner; an underline step bar; far less helper text; report forms fold into sections that show how many fields are filled. The landing page was rewritten to the real flow and three true statements, with no invented numbers. Review endpoints now check case ownership (a lawyer can only act on a case they created or were assigned; an Admin on any). Existing extracted text was cleaned with `scripts/clean_existing_text.py --apply` on 2026-10-12 (6 pages, 6 extractions).
+
+
+## D11 — Production safety: secrets, logs, cost, limits, CI/CD (2026-10-12)
+
+Triggered by a real leak: a failed Cloud Translation call put the full request URL, including `?key=<API key>`, into an error that was stored as page text and shown on screen. Decisions (details in OPERATIONS.md and CICD.md):
+
+- **One redaction layer** (`app/core/redaction.py`) for anything that becomes text: it removes the configured secret values and the usual key shapes. All log output goes through it. The Translation key now travels in a header. Unexpected API errors return a generic message plus a request id.
+- **Translation falls back to Gemini** when Google Translation rejects the key (`TRANSLATION_PROVIDER=auto`). The key in use is not a Cloud Translation key ("API keys are not supported by this API"). Gemini translation costs a few thousandths of a cent per page and is recorded like any other call.
+- **Every model call is recorded** in `llm_usage` (tokens, estimated cost, latency, status) via `LlmCall`/`generate_tracked`. Prices are config estimates, not a bill. Optional daily spend cap (`DAILY_LLM_BUDGET_USD`). Migration `0010_llm_usage.sql` applied to the project on 2026-10-12.
+- **Rate limits** as dependencies using the `limits` library (login by address; uploads and paid calls by user; a blanket per-address limit), Redis-backed in Docker, failing open if the store is down.
+- **Structured JSON logs** with request, user, case and document ids; request-id header; security headers on API and web app; `/health/ready`; log rotation.
+- **Production refuses unsafe settings** (`APP_ENV=production`), and login tokens can use their own `APP_JWT_SECRET`.
+- **Dashboard:** the in-app admin Usage page now; Sentry for errors; Grafana Cloud only if log search is ever needed. No self-hosted Grafana for five users.
+- **CI** on every PR (backend tests with fake credentials, frontend checks and build, image build and start, secret scan); **CD** builds an image per commit and deploys to staging (dev) and production (main, after approval) once a server is configured, with automatic rollback.

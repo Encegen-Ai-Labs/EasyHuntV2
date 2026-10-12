@@ -1,7 +1,10 @@
 from datetime import datetime, timezone
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Query, status
 from typing import List, Dict, Any
-from app.core.exceptions import AuthenticationError
+from app.core.exceptions import AuthenticationError, PropertySystemException
+from app.core.logging import logger
+from app.core.redaction import safe_error
+from app.services import llm_usage
 from app.core.security import get_password_hash
 from app.schemas.auth import ReviewerCreate, UserResponse
 from app.repositories.user_repo import UserRepository
@@ -39,6 +42,23 @@ def create_reviewer(
         "role": created_user["role"],
         "password": payload.password,
     }
+
+@router.get("/usage")
+def get_usage(
+    days: int = Query(7, ge=1, le=90),
+    current_user: Dict[str, Any] = Depends(RoleRequirement(["Admin"])),
+):
+    """What the paid models were used for over the last `days` days: calls,
+    tokens, estimated cost, failures. Admin only. Costs are estimates from
+    the prices in settings, not a bill."""
+    try:
+        return llm_usage.load_summary(days)
+    except Exception as exc:
+        logger.error("admin.usage_unavailable | reason=%s", safe_error(exc, 200))
+        raise PropertySystemException(
+            "Usage data is not available yet. Apply migrations/0010_llm_usage.sql to the database.",
+            status_code=503,
+        )
 
 @router.get("/users", response_model=List[UserResponse])
 def get_all_users(

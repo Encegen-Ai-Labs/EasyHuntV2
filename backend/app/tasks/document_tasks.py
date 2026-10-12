@@ -3,7 +3,7 @@ from typing import Any, Dict
 
 from app.core.config import settings
 from app.core.logging import logger
-from app.dependencies.db import get_supabase_client
+from app.dependencies.db import get_supabase_service_client
 from app.repositories.case_repo import CaseRepository
 from app.repositories.doc_repo import DocumentRepository
 from app.repositories.document_page_repo import DocumentPageRepository
@@ -19,7 +19,7 @@ UNEXPECTED_FAILURE_BASE_SECONDS = 15
 
 
 def _pipeline_service() -> PipelineService:
-    db = get_supabase_client()
+    db = get_supabase_service_client()
     return PipelineService(
         DocumentRepository(db),
         CaseRepository(db),

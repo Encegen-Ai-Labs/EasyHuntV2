@@ -13,7 +13,7 @@ from app.services.embedding_service import embed_text
 from app.core.logging import logger
 from app.repositories.base import BaseRepository
 from app.services.corrections_service import CorrectionRecorder
-from app.dependencies.db import get_supabase_client
+from app.dependencies.db import get_supabase_service_client
 from app.dependencies.auth import RoleRequirement
 from app.core.exceptions import PropertySystemException, ResourceNotFoundError
 from supabase import Client
@@ -23,13 +23,13 @@ router = APIRouter(prefix="/documents", tags=["Document Infrastructure"])
 
 MAX_BATCH_SIZE = 20
 
-def get_doc_service(db: Client = Depends(get_supabase_client)) -> DocumentService:
+def get_doc_service(db: Client = Depends(get_supabase_service_client)) -> DocumentService:
     return DocumentService(DocumentRepository(db), CaseRepository(db))
 
-def get_pipeline_service(db: Client = Depends(get_supabase_client)) -> PipelineService:
+def get_pipeline_service(db: Client = Depends(get_supabase_service_client)) -> PipelineService:
     return PipelineService(DocumentRepository(db), CaseRepository(db), FlagRepository(db), DocumentPageRepository(db))
 
-def get_doc_page_repo(db: Client = Depends(get_supabase_client)) -> DocumentPageRepository:
+def get_doc_page_repo(db: Client = Depends(get_supabase_service_client)) -> DocumentPageRepository:
     return DocumentPageRepository(db)
 
 @router.get("", response_model=List[DocumentResponse])

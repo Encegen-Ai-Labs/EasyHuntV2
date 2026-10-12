@@ -9,6 +9,7 @@ from app.api.v1.reports import router as reports_router
 from app.api.v1.review import router as review_router
 from app.api.v1.search import router as search_router
 from app.api.v1.report_builder import router as report_builder_router
+from app.api.v1.report_generator import router as report_generator_router
 
 router = APIRouter()
 
@@ -21,6 +22,7 @@ router.include_router(reports_router)
 router.include_router(review_router)
 router.include_router(search_router)
 router.include_router(report_builder_router)
+router.include_router(report_generator_router)
 
 
 @router.get("/health")

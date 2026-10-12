@@ -13,6 +13,16 @@ class DocumentPageRepository(BaseRepository):
     def list_by_document(self, document_id: str) -> List[Dict[str, Any]]:
         return self.select("document_pages", {"document_id": document_id})
 
+    def list_by_documents(self, document_ids: List[str]) -> List[Dict[str, Any]]:
+        if not document_ids:
+            return []
+        return (
+            self.client.table("document_pages")
+            .select("document_id,page_number,original_text,english_text")
+            .in_("document_id", document_ids)
+            .execute()
+        ).data
+
     def update_english_text_bulk(self, document_id: str, pages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """pages: [{"page_number": int, "english_text": str}, ...]. One UPDATE
         per page since each page needs a different value — Supabase's update()

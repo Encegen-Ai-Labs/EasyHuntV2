@@ -1,7 +1,7 @@
 # EasyHuntV2: Standard Operating Procedure
 
 AI-assisted property title scrutiny for Indian banks.
-Encegen AI Labs, internal document.
+Encegen AI Labs, internal document. Rewritten 2026-10-12 to the attorney-approved 8-step flow.
 
 ---
 
@@ -17,7 +17,8 @@ EasyHuntV2 automates the property title scrutiny work that lawyers carry out for
 |---|---|
 | Borrower | A person applying to a bank for a home or property loan. Submits their property documents to the bank as part of the application. |
 | Bank | Cannot approve a property loan without knowing the title is clean. Sends the borrower's documents to an empanelled lawyer for scrutiny, and needs the result back in its own specific report format. |
-| Lawyer | A legal professional specialising in property matters. Verifies ownership history, identifies disputes, and produces the scrutiny report in the bank's required format. The only person who logs into and operates EasyHuntV2. |
+| Lawyer (attorney) | A legal professional specialising in property matters. Verifies ownership history, identifies disputes, and produces the scrutiny report. The only person who operates EasyHuntV2 day to day. In the database and API this role is named `Reviewer`; the screens call it "Lawyer". |
+| Admin | Creates lawyer accounts and assigns cases. Does not do scrutiny. |
 
 ---
 
@@ -48,50 +49,41 @@ Multiple documents belong to a single case. A case represents one property under
 
 ## 5. System flow
 
-### Step 1: Case creation
-The lawyer creates a case in EasyHuntV2 for the property being scrutinised.
+Each step unlocks the next. The lawyer works only on documents that have finished processing and that they have approved.
 
-### Step 2: Document upload
-The lawyer uploads all documents relating to that case together, in a batch, rather than one at a time.
+### Step 1: Upload
+The lawyer creates a case and uploads its documents in a batch. After the upload the screen shows a notice asking the lawyer to check every extracted field against the original (spelling, names, numbers, dates) before approving.
 
-### Step 3: Image enhancement
-Every uploaded document is pre-processed to improve legibility before any reading takes place. This covers deskewing, contrast correction, noise reduction and similar, so that whichever engine reads it next has the clearest possible input.
+### Step 2: Document identification and extraction
+Every page is enhanced (deskew, contrast, noise reduction) and then identified.
+- **2a. Handwritten** pages, or pages where OCR confidence is low, go to Gemini, which transcribes and digitises the content.
+- **2b. Typed or printed** pages go to OCR, then on to extraction.
 
-### Step 4: Routing between OCR and VLM/LLM
-Documents that are typed or printed go through OCR, which is fast, cheap and reliable on clean machine text.
+Tables in the source are kept as real tables. No stray `|` characters or `<br>` tags appear in the extracted text.
 
-Documents that are substantially handwritten, or where OCR confidence is low, are routed to the VLM/LLM, which handles messy handwriting and regional scripts far better than OCR can.
+### Step 3: Document approval (per document)
+The lawyer is shown each document next to what was extracted from it, with a translation, and approves each document individually.
+- A document that has finished processing can be reviewed straight away; the lawyer does not wait for the rest of the batch.
+- Handwritten content is always flagged for human verification.
+- An approval can be undone. Un-approving a document removes it from search and from any report until it is approved again.
 
-The LLM acts as the brain across the whole process, not only as a fallback reader.
+### Step 4: Search fields
+Once at least one document is approved, the lawyer opens Search. A form asks for the details being scrutinised: survey / gat / CTS number, owner name, village or location, registration number, and free keywords.
 
-### Step 5: Extraction
-From the document content the system extracts:
+### Step 5: Search results for verification
+Search runs only over approved documents. The screen lists the exact matches and, separately, similar words (spelling variants, transliterations, near matches). The lawyer picks which exact and similar words they want; the documents then highlight those words in place. The lawyer selects the text and findings to carry into the report. Nothing reaches the report without the lawyer choosing it.
 
-- Names of current and previous owners
-- Dates of each transaction
-- Survey and plot numbers
-- Property location and boundaries
-- The nature of each transfer (sale, inheritance, gift, partition)
-- The full chain of ownership: who held the property, in what order
-- Disputes, litigation, encumbrances, and any other red flags affecting title
+### Step 6: Choose what to produce
+When the lawyer is satisfied with the extraction and selections for the documents in question, a report page opens with a dropdown:
+1. **Title Search Report / Legal Search Report.**
+2. **Bank format report.** Pick from the nine bank templates held by the system.
+3. **Upload a bank format** to produce a report in the same layout. Shown as "Coming soon"; not available yet.
 
-### Step 6: Handwriting confirmation
-Where handwritten content was detected, the document is flagged for the lawyer to verify, regardless of how confident the system is. Handwritten material is never accepted without human eyes on it.
+### Step 7: Review and edit the generated report
+The generated report opens in the browser, editable. The lawyer can change any text and can go back to the selections and return. Fields that need legal judgement (opinion, marketability, adverse remarks, tenure) are never filled in for the lawyer; the lawyer writes or confirms them.
 
-### Step 7: Translation
-Extracted content is made available in both the original language of the document and in English. The lawyer can work in either, and the final report can be produced in the language the bank expects.
-
-### Step 8: Lawyer review and selection
-The lawyer reviews the extracted data, corrects anything wrong, and selects the specific text and findings to carry into the report. Nothing reaches the report without the lawyer choosing it.
-
-### Step 9: Report format selection
-The lawyer picks the required bank's scrutiny report format from a dropdown. The system holds 12 bank formats as templates.
-
-### Step 10: Report generation
-The chosen template, which contains placeholder names and details, is populated with the real extracted and lawyer-approved data from the case documents. The output is a scrutiny report in exactly the format that bank expects to receive.
-
-### Step 11: Export and delivery
-The completed report is exported and sent to the bank, which can read it in its own familiar format and make its lending decision.
+### Step 8: Download
+Once approved, the lawyer downloads the report as Word or PDF.
 
 ---
 
@@ -111,8 +103,9 @@ Its output is always a draft for a qualified lawyer to verify and approve. It ne
 
 ## 7. Core operating principles
 
-- The lawyer is the only user. There is no borrower or bank login.
 - Nothing goes into a report without the lawyer selecting or approving it.
+- Search and reports use approved documents only.
 - Handwritten content is always flagged for human verification.
 - The system assists judgement, it does not replace it.
-- Reports must match the receiving bank's format exactly. That is the entire purpose of holding 12 templates.
+- Reports must match the receiving bank's format exactly. That is the purpose of holding the bank templates.
+- Accounts are created by an admin. There is no self-registration and no borrower or bank login.

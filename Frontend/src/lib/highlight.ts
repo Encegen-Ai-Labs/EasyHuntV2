@@ -80,3 +80,21 @@ export function highlightSegments(text: string, query: string, passageFallback =
   }
   return { segments: [{ text: normalizedText, match: false }], mode: "none" };
 }
+
+/**
+ * Splits `text` into segments, marking every whole-word occurrence of any of
+ * `words` (the exact and similar words the lawyer picked on the search screen).
+ * Matching is case-insensitive and NFC-normalized like highlightSegments, and a
+ * word only matches as a whole word, so picking "Patil" does not mark the start
+ * of "Patilwadi" (pick that word too if it is wanted).
+ */
+export function highlightWords(text: string, words: string[]): HighlightSegment[] {
+  const normalizedText = text.normalize("NFC");
+  const unique = [...new Set(words.map((w) => w.normalize("NFC").trim()).filter(Boolean))];
+  if (unique.length === 0) return [{ text: normalizedText, match: false }];
+
+  const alternation = unique.sort((a, b) => b.length - a.length).map(escapeRegExp).join("|");
+  // Word edges are "not a letter, mark or digit", so Devanagari words are not cut mid-letter.
+  const matcher = new RegExp(String.raw`(?<![\p{L}\p{M}\p{N}])(?:${alternation})(?![\p{L}\p{M}\p{N}])`, "giu");
+  return segmentsFor(normalizedText, matcher) ?? [{ text: normalizedText, match: false }];
+}

@@ -88,3 +88,31 @@ describe("highlightSegments with Marathi and Hindi", () => {
     expect(highlightSegments("नोंदणी", "registration").mode).toBe("none");
   });
 });
+
+import { highlightWords } from "./highlight";
+
+describe("highlightWords", () => {
+  const marks = (text: string, words: string[]) =>
+    highlightWords(text, words).filter((s) => s.match).map((s) => s.text);
+
+  it("marks only whole words, case-insensitively", () => {
+    expect(marks("Patil sold to patil of Patilwadi", ["Patil"])).toEqual(["Patil", "patil"]);
+  });
+
+  it("marks several picked words and prefers the longer one", () => {
+    expect(marks("Patil and Pateel and Patilwadi", ["Patil", "Pateel", "Patilwadi"])).toEqual([
+      "Patil",
+      "Pateel",
+      "Patilwadi",
+    ]);
+  });
+
+  it("does not cut a Devanagari word and ignores regex characters", () => {
+    expect(marks("श्री पाटील आणि पाटिल", ["पाटील"])).toEqual(["पाटील"]);
+    expect(marks("Survey (45) here", ["(45)"])).toEqual(["(45)"]);
+  });
+
+  it("returns the text unmarked when no words are given", () => {
+    expect(highlightWords("abc", [])).toEqual([{ text: "abc", match: false }]);
+  });
+});

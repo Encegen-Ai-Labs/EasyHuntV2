@@ -107,6 +107,69 @@ export interface SearchResponse {
   similar_unavailable?: boolean;
 }
 
+export interface SearchTerm {
+  term: string;
+  /** "exact" is the word as searched; "similar" is a close spelling or a longer/shorter form of it. */
+  kind: "exact" | "similar";
+  count: number;
+  similarity: number;
+  locations: { document_id: string; page_number: number }[];
+}
+
+export interface ReportFormat {
+  id: string;
+  kind: "title_search" | "bank";
+  label: string;
+}
+
+export interface DraftBlock {
+  type: "paragraph" | "table";
+  text: string;
+  columns: string[];
+  rows: string[][];
+}
+
+export interface DraftSection {
+  id: string;
+  heading: string;
+  blocks: DraftBlock[];
+}
+
+export interface DraftField {
+  name: string;
+  label: string;
+  type: string;
+  options: string[];
+  source: string;
+  review_level: string;
+  required: boolean;
+  value: string;
+  group: string;
+  /** Filled from the approved documents; the lawyer should check it. */
+  suggested: boolean;
+}
+
+export interface DraftLoop {
+  name: string;
+  label: string;
+  item_fields: string[];
+  nested_lists: Record<string, string>;
+  /** Each row maps an item field to text; a nested list maps to string[] (or a string while being edited). */
+  rows: Record<string, string | string[]>[];
+  suggested: boolean;
+}
+
+export interface ReportDraft {
+  format_id: string;
+  kind: "title_search" | "bank";
+  title: string;
+  bank?: string | null;
+  warnings: string[];
+  sections: DraftSection[];
+  fields: DraftField[];
+  loops: DraftLoop[];
+}
+
 export interface ReportExcerpt {
   id: string;
   document_id: string;
@@ -177,6 +240,12 @@ function getAuthHeaders(extraHeaders: Record<string, string> = {}): Record<strin
     }
   }
   return headers;
+}
+
+/** The server's own message (FastAPI puts it in `detail`) or a plain fallback. */
+async function errorMessage(res: Response, fallback: string): Promise<string> {
+  const body = await res.json().catch(() => ({}));
+  return (typeof body.detail === "string" && body.detail) || `${fallback} (${res.status})`;
 }
 
 function normalizeCase(item: any): CaseRecord {
@@ -572,6 +641,20 @@ export const apiClient = {
   // actual Gemini output (extraction.validated_json_output) plus a signed file_url
   // for the source document, not just upload/status metadata.
   review: {
+    /** Undo an approval: the document goes back to review and out of search and reports. */
+    reopenDocument: async (documentId: string): Promise<{ success: boolean; data?: any; error?: string }> => {
+      try {
+        const res = await fetch(`${API_BASE_URL}/review/documents/${documentId}/reopen`, {
+          method: "POST",
+          headers: getAuthHeaders({ "Content-Type": "application/json" }),
+        });
+        if (!res.ok) throw new Error(await errorMessage(res, "Could not undo the approval"));
+        return { success: true, data: await res.json() };
+      } catch (err: any) {
+        return { success: false, error: err.message };
+      }
+    },
+
     getCaseDocuments: async (caseId: string): Promise<{ success: boolean; data?: ReviewDocumentEntry[]; error?: string }> => {
       try {
         const res = await fetch(`${API_BASE_URL}/review/${caseId}/documents`, {
@@ -610,7 +693,57 @@ export const apiClient = {
     },
   },
 
-  // Admin-only reviewer account management (backend: app/api/v1/admin.py).
+  reportGenerator: {
+    formats: async (caseId: string): Promise<{ success: boolean; data?: ReportFormat[]; error?: string }> => {
+      try {
+        const res = await fetch(`${API_BASE_URL}/cases/${caseId}/report/formats`, {
+          headers: getAuthHeaders({ "Content-Type": "application/json" }),
+        });
+        if (!res.ok) throw new Error(await errorMessage(res, "Could not load report formats"));
+        return { success: true, data: await res.json() };
+      } catch (err: any) {
+        return { success: false, error: err.message };
+      }
+    },
+
+    createDraft: async (caseId: string, formatId: string): Promise<{ success: boolean; data?: ReportDraft; error?: string }> => {
+      try {
+        const res = await fetch(`${API_BASE_URL}/cases/${caseId}/report/draft`, {
+          method: "POST",
+          headers: getAuthHeaders({ "Content-Type": "application/json" }),
+          body: JSON.stringify({ format_id: formatId }),
+        });
+        if (!res.ok) throw new Error(await errorMessage(res, "Could not create the report"));
+        return { success: true, data: await res.json() };
+      } catch (err: any) {
+        return { success: false, error: err.message };
+      }
+    },
+
+    /** Returns the file as a Blob; the caller saves it. Nothing is stored on the server. */
+    exportDraft: async (
+      caseId: string,
+      draft: ReportDraft,
+      fileType: "docx" | "pdf"
+    ): Promise<{ success: boolean; data?: { blob: Blob; filename: string }; error?: string }> => {
+      try {
+        const res = await fetch(`${API_BASE_URL}/cases/${caseId}/report/export`, {
+          method: "POST",
+          headers: getAuthHeaders({ "Content-Type": "application/json" }),
+          body: JSON.stringify({ draft, file_type: fileType }),
+        });
+        if (!res.ok) throw new Error(await errorMessage(res, "Could not create the file"));
+        const disposition = res.headers.get("Content-Disposition") || "";
+        const filename = /filename="([^"]+)"/.exec(disposition)?.[1] || `report.${fileType}`;
+        return { success: true, data: { blob: await res.blob(), filename } };
+      } catch (err: any) {
+        return { success: false, error: err.message };
+      }
+    },
+  },
+
+  // Admin-only lawyer account management (backend: app/api/v1/admin.py; the
+  // role is stored as "Reviewer", the screens call it "Lawyer").
   // Unlike the namespaces above, these throw on failure rather than returning
   // { success: false }, since UserManagementPage.tsx calls them from a try/catch.
   admin: {
@@ -656,6 +789,25 @@ export const apiClient = {
   },
 
   search: {
+    /** The exact words, then close spellings, found in the case's approved documents. */
+    findTerms: async (
+      caseId: string,
+      query: string
+    ): Promise<{ success: boolean; data?: { terms: SearchTerm[]; untranslatedDocumentIds: string[] }; error?: string }> => {
+      try {
+        const url = new URL(`${API_BASE_URL}/cases/${caseId}/search/terms`);
+        url.searchParams.set("q", query);
+        const res = await fetch(url.toString(), {
+          headers: getAuthHeaders({ "Content-Type": "application/json" }),
+        });
+        if (!res.ok) throw new Error(await errorMessage(res, "Search failed"));
+        const body = await res.json();
+        return { success: true, data: { terms: body.terms, untranslatedDocumentIds: body.untranslated_document_ids ?? [] } };
+      } catch (err: any) {
+        return { success: false, error: err.message };
+      }
+    },
+
     searchCase: async (
       caseId: string,
       query: string,

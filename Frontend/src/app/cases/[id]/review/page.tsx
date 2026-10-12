@@ -1,5 +1,12 @@
+"use client";
+
+import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { ReviewPage } from "@/components/screens/ReviewPage";
 
 export default function ReviewRoute() {
-  return <ReviewPage />;
+  return (
+    <ProtectedRoute allowedRoles={["Reviewer", "Admin"]}>
+      <ReviewPage />
+    </ProtectedRoute>
+  );
 }

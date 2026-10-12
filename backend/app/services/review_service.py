@@ -136,6 +136,36 @@ class ReviewService:
             "corrections": corrections,
         }
 
+    def reopen_document_review(self, document_id: str) -> Dict[str, Any]:
+        """Undoes an approval (or a "flag for correction"): the extraction goes
+        back to pending review and the document to llm_done, so it drops out of
+        search and reports until the lawyer approves it again. The lawyer's
+        edited field values are kept; only the decision is withdrawn."""
+        document = self.doc_repo.get_by_id(document_id)
+        if not document:
+            raise ResourceNotFoundError("Document not found")
+        if document.get("status") not in {"approved", "rejected", "completed"}:
+            raise PropertySystemException("Only a reviewed document can be reopened", status_code=409)
+
+        extraction = self.extraction_repo.select_one(
+            "extractions", {"document_id": document_id}, order_by="id"
+        )
+        if not extraction:
+            raise ResourceNotFoundError("AI extraction not found for document")
+
+        updated = self.extraction_repo.update(
+            "extractions",
+            {"id": extraction["id"]},
+            {"status": "pending_review", "reviewed_by": None, "reviewed_at": None},
+        )
+        if not updated:
+            raise PropertySystemException(
+                "The review was not reopened: no extraction record was updated. Reload the page and try again.",
+                status_code=409,
+            )
+        updated_document = self.doc_repo.update_status(document_id, "llm_done")
+        return {"document": updated_document, "extraction": updated[0]}
+
     def resolve_flag(self, flag_id: str, user_id: str, resolution_notes: str, status: str) -> Dict[str, Any]:
         payload = {
             "status": status,

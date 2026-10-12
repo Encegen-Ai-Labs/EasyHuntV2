@@ -9,7 +9,7 @@ from app.repositories.case_repo import CaseRepository
 from app.repositories.doc_repo import DocumentRepository
 from app.repositories.flag_repo import FlagRepository
 from app.services.review_service import ReviewService
-from app.dependencies.db import get_supabase_client
+from app.dependencies.db import get_supabase_service_client
 from app.dependencies.auth import RoleRequirement
 from supabase import Client
 
@@ -19,7 +19,7 @@ router = APIRouter(prefix="/admin", tags=["Administration Portal"])
 def create_reviewer(
     payload: ReviewerCreate,
     current_user: Dict[str, Any] = Depends(RoleRequirement(["Admin"])),
-    db: Client = Depends(get_supabase_client)
+    db: Client = Depends(get_supabase_service_client)
 ):
     repo = UserRepository(db)
     if repo.get_by_email(str(payload.email)):
@@ -43,7 +43,7 @@ def create_reviewer(
 @router.get("/users", response_model=List[UserResponse])
 def get_all_users(
     current_user: Dict[str, Any] = Depends(RoleRequirement(["Admin"])),
-    db: Client = Depends(get_supabase_client)
+    db: Client = Depends(get_supabase_service_client)
 ):
     repo = UserRepository(db)
     return repo.list_all_users()
@@ -53,7 +53,7 @@ def assign_reviewer_to_case(
     case_id: str,
     reviewer_id: str,
     current_user: Dict[str, Any] = Depends(RoleRequirement(["Admin"])),
-    db: Client = Depends(get_supabase_client)
+    db: Client = Depends(get_supabase_service_client)
 ):
     service = ReviewService(
         CaseRepository(db), FlagRepository(db), DocumentRepository(db)

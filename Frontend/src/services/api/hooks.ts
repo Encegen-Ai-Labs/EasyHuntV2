@@ -76,6 +76,7 @@ export function useSubmitDocumentReviewMutation() {
         });
       }
       queryClient.invalidateQueries({ queryKey: ["review", variables.caseId, "documents"] });
+      queryClient.invalidateQueries({ queryKey: ["documents", variables.caseId, "list"] });
     },
   });
 }
@@ -171,6 +172,49 @@ export function useResolveFlagMutation() {
       apiClient.flags.resolve(flagId, notes, status),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["flags"] });
+    },
+  });
+}
+
+/** Statuses a document can be in while it is still being read. */
+export const DOCUMENT_IN_PROGRESS = new Set(["uploaded", "processing", "ocr_done"]);
+/** A lawyer-approved document: the only kind search and reports use. */
+export const DOCUMENT_APPROVED = new Set(["approved", "completed"]);
+
+/** The case's documents, refreshed every few seconds while any is still being read. */
+export function useCaseDocuments(caseId: string) {
+  return useQuery({
+    queryKey: ["documents", caseId, "list"],
+    queryFn: async () => {
+      const result = await apiClient.documents.listByCase(caseId);
+      if (!result.success) throw new Error(result.error || "Failed to load documents");
+      return result.data || [];
+    },
+    enabled: Boolean(caseId),
+    staleTime: 0,
+    refetchInterval: (query) =>
+      query.state.data?.some((doc) => DOCUMENT_IN_PROGRESS.has(doc.status)) ? 3000 : false,
+  });
+}
+
+/** How far along a case is, for the step bar and for gating later steps. */
+export function useCaseProgress(caseId: string) {
+  const { data: documents = [], isLoading } = useCaseDocuments(caseId);
+  const total = documents.length;
+  const processing = documents.filter((d) => DOCUMENT_IN_PROGRESS.has(d.status)).length;
+  const approved = documents.filter((d) => DOCUMENT_APPROVED.has(d.status)).length;
+  const readyToReview = total - processing - approved;
+  return { documents, isLoading, total, processing, approved, readyToReview };
+}
+
+export function useReopenDocumentMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ documentId }: { documentId: string; caseId: string }) =>
+      apiClient.review.reopenDocument(documentId),
+    onSuccess: (_result, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["review", variables.caseId, "documents"] });
+      queryClient.invalidateQueries({ queryKey: ["documents", variables.caseId, "list"] });
     },
   });
 }

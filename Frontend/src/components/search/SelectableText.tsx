@@ -3,11 +3,13 @@
 import React, { useRef } from "react";
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { HighlightedText } from "@/components/search/HighlightedText";
+import { FormattedText } from "@/components/text/FormattedText";
 
 interface SelectableTextProps {
   text: string;
   query: string;
+  /** Exact words to highlight (the lawyer's picks); when given, `query` is ignored. */
+  words?: string[];
   /** Called with the selected substring, or null if nothing valid was selected. */
   onAddSelection: (selectedText: string | null) => void;
   addLabel?: string;
@@ -51,7 +53,7 @@ function expandRangeToWordBoundaries(range: Range): Range {
  * span with the mouse (browser text selection) — a boundary landing mid-word
  * snaps out to the whole word on each end — then clicks the button to send
  * that (widened) span to the report builder, not the whole block. */
-export function SelectableText({ text, query, onAddSelection, addLabel = "Add selection to report", disabled }: SelectableTextProps) {
+export function SelectableText({ text, query, words, onAddSelection, addLabel = "Add selection to report", disabled }: SelectableTextProps) {
   const containerRef = useRef<HTMLDivElement>(null);
 
   function handleAddClick() {
@@ -81,8 +83,8 @@ export function SelectableText({ text, query, onAddSelection, addLabel = "Add se
 
   return (
     <div className="flex flex-col gap-2">
-      <div ref={containerRef} className="whitespace-pre-wrap leading-relaxed">
-        <HighlightedText text={text} query={query} />
+      <div ref={containerRef}>
+        <FormattedText text={text} query={query} words={words} />
       </div>
       <Button
         type="button"

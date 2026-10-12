@@ -7,16 +7,16 @@ from app.repositories.case_repo import CaseRepository
 from app.repositories.doc_repo import DocumentRepository
 from app.repositories.flag_repo import FlagRepository
 from app.repositories.document_page_repo import DocumentPageRepository
-from app.dependencies.db import get_supabase_client
+from app.dependencies.db import get_supabase_service_client
 from app.dependencies.auth import get_current_user, RoleRequirement
 from supabase import Client
 
 router = APIRouter(prefix="/cases", tags=["Case Management"])
 
-def get_case_service(db: Client = Depends(get_supabase_client)) -> CaseService:
+def get_case_service(db: Client = Depends(get_supabase_service_client)) -> CaseService:
     return CaseService(CaseRepository(db))
 
-def get_pipeline_service(db: Client = Depends(get_supabase_client)) -> PipelineService:
+def get_pipeline_service(db: Client = Depends(get_supabase_service_client)) -> PipelineService:
     return PipelineService(DocumentRepository(db), CaseRepository(db), FlagRepository(db), DocumentPageRepository(db))
 
 @router.post("", response_model=CaseResponse, status_code=status.HTTP_201_CREATED)

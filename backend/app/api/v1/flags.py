@@ -6,7 +6,7 @@ from app.schemas.flags import FlagCreate, FlagResponse, FlagResolve, FlagStatusE
 from app.repositories.flag_repo import FlagRepository, FLAGS_TABLE
 from app.services.review_service import ReviewService
 from app.repositories.case_repo import CaseRepository
-from app.dependencies.db import get_supabase_client, get_supabase_service_client
+from app.dependencies.db import get_supabase_service_client
 from app.dependencies.auth import get_current_user, RoleRequirement
 from app.core.exceptions import ResourceNotFoundError
 from supabase import Client

@@ -4,7 +4,7 @@ from jose import jwt, JWTError
 from app.core.config import settings
 from app.core.exceptions import AuthenticationError, PermissionDeniedError
 from app.repositories.user_repo import UserRepository
-from app.dependencies.db import get_supabase_client
+from app.dependencies.db import get_supabase_service_client
 from supabase import Client
 from typing import Dict, Any, List
 
@@ -12,7 +12,7 @@ security_bearer = HTTPBearer()
 
 def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(security_bearer),
-    db: Client = Depends(get_supabase_client)
+    db: Client = Depends(get_supabase_service_client)
 ) -> Dict[str, Any]:
     token = credentials.credentials
     try:

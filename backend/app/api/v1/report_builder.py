@@ -14,13 +14,13 @@ from app.repositories.doc_repo import DocumentRepository
 from app.repositories.case_repo import CaseRepository
 from app.repositories.report_repo import ReportRepository
 from app.repositories.report_excerpt_repo import ReportExcerptRepository
-from app.dependencies.db import get_supabase_client
+from app.dependencies.db import get_supabase_service_client
 from app.dependencies.auth import RoleRequirement
 from supabase import Client
 
 router = APIRouter(prefix="/cases", tags=["Report Builder"])
 
-def get_report_builder_service(db: Client = Depends(get_supabase_client)) -> ReportBuilderService:
+def get_report_builder_service(db: Client = Depends(get_supabase_service_client)) -> ReportBuilderService:
     doc_repo = DocumentRepository(db)
     doc_service = DocumentService(doc_repo, CaseRepository(db))
     return ReportBuilderService(doc_service, ReportRepository(db), ReportExcerptRepository(db), doc_repo)

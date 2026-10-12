@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, status
 from supabase import Client
 
 from app.dependencies.auth import RoleRequirement, get_current_user
-from app.dependencies.db import get_supabase_client, get_supabase_service_client
+from app.dependencies.db import get_supabase_service_client
 from app.repositories.case_repo import CaseRepository
 from app.repositories.report_repo import ReportRepository
 from app.services.report_service import ReportGenerationService
@@ -31,7 +31,7 @@ def generate_report(
 def get_report_download_url(
     case_id: str,
     current_user: Dict[str, Any] = Depends(get_current_user),
-    db: Client = Depends(get_supabase_client)
+    db: Client = Depends(get_supabase_service_client)
 ):
     repo = ReportRepository(db)
     report = repo.get_by_case(case_id)

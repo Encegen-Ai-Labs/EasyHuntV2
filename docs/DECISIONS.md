@@ -144,3 +144,6 @@ Triggered by a real leak: a failed Cloud Translation call put the full request U
 - **Production refuses unsafe settings** (`APP_ENV=production`), and login tokens can use their own `APP_JWT_SECRET`.
 - **Dashboard:** the in-app admin Usage page now; Sentry for errors; Grafana Cloud only if log search is ever needed. No self-hosted Grafana for five users.
 - **CI** on every PR (backend tests with fake credentials, frontend checks and build, image build and start, secret scan); **CD** builds an image per commit and deploys to staging (dev) and production (main, after approval) once a server is configured, with automatic rollback.
+
+
+**Cleanup (2026-10-12):** deleted the code the new flow replaced: `CaseSearchPanel.tsx` and the front-end `searchCase` call, `FullCaseDashboard.tsx` (never imported), and the old excerpt-PDF export (endpoint `POST /report-builder/export`, `ReportBuilderService.export_pdf`, `build_excerpt_report_pdf`, `ReportExportResponse`, `exportPdf`). The Devanagari PDF font tests moved to the new PDF builder. The passage-level semantic search endpoint (`/search?mode=semantic`) and the older summary-PDF flow (`/reports/generate`, `report_service.py`) remain in the backend with no screen using them.

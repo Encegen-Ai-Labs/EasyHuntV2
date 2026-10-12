@@ -6,11 +6,8 @@ from app.repositories.doc_repo import DocumentRepository
 from app.repositories.report_excerpt_repo import ReportExcerptRepository
 from app.repositories.report_repo import ReportRepository
 from app.services.doc_service import DocumentService
-from app.services.report_pdf_builder import build_excerpt_report_pdf
-from app.services.translation_service import translate_to_english
 
 REPORT_TYPE = "manual"
-REPORTS_BUCKET = "reports"  # same Supabase Storage bucket report_service.py's PDF-summary flow uses
 
 
 class ReportBuilderService:
@@ -133,47 +130,6 @@ class ReportBuilderService:
             self.excerpt_repo.update_sequence(excerpt_id, index)
 
         return self.excerpt_repo.list_by_report(report["id"])
-
-    def export_pdf(self, case_id: str, current_user: Dict[str, Any]) -> Dict[str, Any]:
-        result = self.get_report_with_excerpts(case_id, current_user)
-        case = self.doc_service.case_repo.get_by_id(case_id) or {"id": case_id}
-
-        # Translate every excerpt to English for the exported PDF (user's
-        # explicit choice, 2026-08-21 — every excerpt always shows both
-        # languages). Excerpts carry no language tag and are just whatever
-        # text the reviewer selected/edited, so translating fresh here rather
-        # than reusing whatever page-level english_text may or may not exist
-        # keeps the PDF accurate to the excerpt's actual current text. One
-        # Translate API call per excerpt per export; a failed translation
-        # doesn't block the export, same fallback-sentinel pattern as
-        # translation_service.translate_pages().
-        excerpts_with_translation: List[Dict[str, Any]] = []
-        for excerpt in result["excerpts"]:
-            translation = translate_to_english(excerpt.get("excerpt_text", ""))
-            english_text = (
-                translation["translated_text"]
-                if translation["success"]
-                else f"[translation failed: {translation['error']}]"
-            )
-            excerpts_with_translation.append({**excerpt, "english_text": english_text})
-
-        pdf_bytes = build_excerpt_report_pdf(case, excerpts_with_translation)
-
-        # Distinct path from report_service.py's PDF-summary flow
-        # (reports/{case_id}/verification_report.pdf) so the two don't collide.
-        storage_path = f"reports/{case_id}/manual/report.pdf"
-        self.report_repo.client.storage.from_(REPORTS_BUCKET).upload(
-            path=storage_path,
-            file=pdf_bytes,
-            file_options={"content-type": "application/pdf", "x-upsert": "true"},
-        )
-        self.report_repo.update_file_path(result["id"], storage_path)
-
-        signed_url = self.report_repo.client.storage.from_(REPORTS_BUCKET).create_signed_url(
-            storage_path, 3600
-        )["signedURL"]
-
-        return {"file_path": storage_path, "download_url": signed_url}
 
     def _get_owned_excerpt(self, report_id: str, excerpt_id: str) -> Dict[str, Any]:
         excerpt = self.excerpt_repo.get_by_id(excerpt_id)

@@ -86,27 +86,6 @@ export interface FlagRecord {
   resolution_notes?: string | null;
 }
 
-export type SearchMode = "exact" | "semantic";
-
-export interface SearchResult {
-  document_id: string;
-  document_name?: string;
-  page_number: number;
-  matched_in: "original" | "english" | "semantic";
-  snippet: string;
-  // Only set for semantic-mode results (0..1, higher = more relevant) —
-  // exact mode has no ranking score, a substring either matched or it didn't.
-  similarity?: number;
-}
-
-export interface SearchResponse {
-  query: string;
-  mode: SearchMode;
-  results: SearchResult[];
-  /** Semantic mode only: the similar-meaning part could not run; results are exact matches only. */
-  similar_unavailable?: boolean;
-}
-
 export interface SearchTerm {
   term: string;
   /** "exact" is the word as searched; "similar" is a close spelling or a longer/shorter form of it. */
@@ -131,6 +110,17 @@ export interface UsageSummary {
   by_kind: { kind: string; calls: number; tokens_in: number; tokens_out: number; errors: number; cost_usd: number }[];
   top_cases: { case_id: string; name: string | null; cost_usd: number }[];
   recent_failures: { created_at: string; kind: string; status: string; error: string | null }[];
+}
+
+export interface AppError {
+  created_at: string;
+  event: string | null;
+  message: string;
+  exception: string | null;
+  request_id: string | null;
+  user_id: string | null;
+  case_id: string | null;
+  document_id: string | null;
 }
 
 export interface ReportFormat {
@@ -203,11 +193,6 @@ export interface ReportBuilderState {
   case_id: string;
   status: string;
   excerpts: ReportExcerpt[];
-}
-
-export interface ReportExportResult {
-  file_path: string;
-  download_url: string;
 }
 
 // Shape of app/services/pipeline_service.py's "extractions" table rows — the
@@ -775,6 +760,18 @@ export const apiClient = {
       return res.json();
     },
 
+    getErrors: async (): Promise<{ success: boolean; data?: AppError[]; error?: string }> => {
+      try {
+        const res = await fetch(`${API_BASE_URL}/admin/errors?limit=50`, {
+          headers: getAuthHeaders({ "Content-Type": "application/json" }),
+        });
+        if (!res.ok) throw new Error(await errorMessage(res, "Could not load errors"));
+        return { success: true, data: (await res.json()).errors };
+      } catch (err: any) {
+        return { success: false, error: err.message };
+      }
+    },
+
     getUsage: async (days: number): Promise<{ success: boolean; data?: UsageSummary; error?: string }> => {
       try {
         const res = await fetch(`${API_BASE_URL}/admin/usage?days=${days}`, {
@@ -832,28 +829,6 @@ export const apiClient = {
         if (!res.ok) throw new Error(await errorMessage(res, "Search failed"));
         const body = await res.json();
         return { success: true, data: { terms: body.terms, untranslatedDocumentIds: body.untranslated_document_ids ?? [] } };
-      } catch (err: any) {
-        return { success: false, error: err.message };
-      }
-    },
-
-    searchCase: async (
-      caseId: string,
-      query: string,
-      mode: SearchMode = "exact"
-    ): Promise<{ success: boolean; data?: SearchResponse; error?: string }> => {
-      try {
-        const url = new URL(`${API_BASE_URL}/cases/${caseId}/search`);
-        url.searchParams.set("q", query);
-        url.searchParams.set("mode", mode);
-        const res = await fetch(url.toString(), {
-          headers: getAuthHeaders({ "Content-Type": "application/json" }),
-        });
-        if (!res.ok) {
-          const errData = await res.json().catch(() => ({}));
-          throw new Error(errData.detail || `Search failed with status ${res.status}`);
-        }
-        return { success: true, data: await res.json() };
       } catch (err: any) {
         return { success: false, error: err.message };
       }
@@ -938,22 +913,6 @@ export const apiClient = {
         if (!res.ok) {
           const errData = await res.json().catch(() => ({}));
           throw new Error(errData.detail || `Failed to reorder excerpts (${res.status})`);
-        }
-        return { success: true, data: await res.json() };
-      } catch (err: any) {
-        return { success: false, error: err.message };
-      }
-    },
-
-    exportPdf: async (caseId: string): Promise<{ success: boolean; data?: ReportExportResult; error?: string }> => {
-      try {
-        const res = await fetch(`${API_BASE_URL}/cases/${caseId}/report-builder/export`, {
-          method: "POST",
-          headers: getAuthHeaders({ "Content-Type": "application/json" }),
-        });
-        if (!res.ok) {
-          const errData = await res.json().catch(() => ({}));
-          throw new Error(errData.detail || `Export failed with status ${res.status}`);
         }
         return { success: true, data: await res.json() };
       } catch (err: any) {

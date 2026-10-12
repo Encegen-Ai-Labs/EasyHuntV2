@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
-import { apiClient, type UsageSummary } from "@/services/api/client";
+import { apiClient, type AppError, type UsageSummary } from "@/services/api/client";
 import { PageHeader } from "@/components/case/PageHeader";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -37,6 +37,8 @@ export function UsagePage() {
   const [data, setData] = useState<UsageSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [errors, setErrors] = useState<AppError[] | null>(null);
+  const [errorsNote, setErrorsNote] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -52,6 +54,13 @@ export function UsagePage() {
       cancelled = true;
     };
   }, [days]);
+
+  useEffect(() => {
+    void apiClient.admin.getErrors().then((result) => {
+      if (result.success && result.data) setErrors(result.data);
+      else setErrorsNote(result.error || "Could not load errors.");
+    });
+  }, []);
 
   const peak = Math.max(0.0001, ...(data?.by_day.map((d) => d.cost_usd) ?? [0]));
   const failures = data ? data.errors + data.rate_limited : 0;
@@ -82,6 +91,26 @@ export function UsagePage() {
 
         {data && !loading && (
           <div className="flex flex-col gap-8">
+            <section>
+              <h2 className="mb-3 font-heading text-xl font-medium">Recent server errors</h2>
+              {errorsNote && <p className="text-sm text-muted-foreground">{errorsNote}</p>}
+              {errors && errors.length === 0 && <p className="text-sm text-muted-foreground">None recorded.</p>}
+              {errors && errors.length > 0 && (
+                <ul className="divide-y divide-border rounded-lg border border-border text-sm">
+                  {errors.map((item, index) => (
+                    <li key={index} className="px-3 py-2">
+                      <p className="flex flex-wrap justify-between gap-x-3">
+                        <span className="font-medium">{item.event ?? item.exception ?? "error"}</span>
+                        <span className="text-xs text-muted-foreground">{new Date(item.created_at).toLocaleString()}</span>
+                      </p>
+                      <p className="mt-0.5 break-words text-xs text-muted-foreground">{item.message}</p>
+                      {item.request_id && <p className="mt-0.5 text-[11px] text-muted-foreground/70">ref {item.request_id}</p>}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
               <Tile
                 label="Today"

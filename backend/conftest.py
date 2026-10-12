@@ -9,6 +9,8 @@ sys.path.insert(0, os.path.dirname(__file__))
 os.environ["EXTRACTION_CACHE_ENABLED"] = "false"
 os.environ["CELERY_ENABLED"] = "false"
 os.environ["APP_ENV"] = "development"
+# Errors are copied to the database in production; tests must not reach it.
+os.environ["ERROR_STORE_ENABLED"] = "false"
 # Rate limiting has its own tests; elsewhere it would only make tests order-dependent.
 os.environ["RATE_LIMIT_ENABLED"] = "false"
 

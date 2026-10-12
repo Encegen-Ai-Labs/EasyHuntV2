@@ -1,0 +1,2 @@
+# Fake JWT used to test redaction (a well-known sample, signs nothing).
+5fd0fb3f3808169048a84b95cdc0ac294aa5a922:backend/tests/test_redaction.py:jwt:23

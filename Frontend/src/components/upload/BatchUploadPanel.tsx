@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AlertTriangle, ArrowRight, UploadCloud, FileText, X, Loader2, Ban } from "lucide-react";
 import { apiClient } from "@/services/api/client";
@@ -11,13 +11,6 @@ import { Progress } from "@/components/ui/progress";
 const ALLOWED_TYPES = ["application/pdf", "image/png", "image/jpeg", "image/jpg"];
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 const MAX_BATCH_SIZE = 20;
-const TERMINAL_STATUSES = ["llm_done", "under_review", "approved", "flagged", "rejected", "completed", "failed"];
-
-interface TrackedDocument {
-  documentId?: string;
-  status: string; // "failed" (upload-time) or a backend DocStatusEnum value
-}
-
 interface BatchUploadPanelProps {
   caseId: string;
   /** Called once per successful upload batch, after results are known (not after processing finishes). */
@@ -31,8 +24,9 @@ export function BatchUploadPanel({ caseId, onUploaded }: BatchUploadPanelProps) 
   const [queuedFiles, setQueuedFiles] = useState<File[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
-  const [tracked, setTracked] = useState<TrackedDocument[]>([]);
-  const [hasUploadedDocuments, setHasUploadedDocuments] = useState(false);
+  // How many files the last upload accepted; drives the "check the extracted
+  // fields" notice, which stays until the lawyer dismisses it.
+  const [uploadedCount, setUploadedCount] = useState(0);
   const [queueWarning, setQueueWarning] = useState<string | null>(null);
   // When the same file was extracted before, its saved result is reused. A
   // lawyer who re-uploads because that read looked wrong ticks this to get a
@@ -40,18 +34,6 @@ export function BatchUploadPanel({ caseId, onUploaded }: BatchUploadPanelProps) 
   const [forceRefresh, setForceRefresh] = useState(false);
 
   const abortControllerRef = useRef<AbortController | null>(null);
-  const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const trackedRef = useRef<TrackedDocument[]>([]);
-
-  useEffect(() => {
-    trackedRef.current = tracked;
-  }, [tracked]);
-
-  useEffect(() => {
-    return () => {
-      if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
-    };
-  }, []);
 
   function addFiles(fileList: FileList | null) {
     if (!fileList) return;
@@ -93,38 +75,6 @@ export function BatchUploadPanel({ caseId, onUploaded }: BatchUploadPanelProps) 
     abortControllerRef.current?.abort();
   }
 
-  function startPolling() {
-    if (pollIntervalRef.current) return;
-
-    pollIntervalRef.current = setInterval(async () => {
-      const pending = trackedRef.current.filter(
-        (t) => t.documentId && !TERMINAL_STATUSES.includes(t.status)
-      );
-
-      if (pending.length === 0) {
-        if (pollIntervalRef.current) {
-          clearInterval(pollIntervalRef.current);
-          pollIntervalRef.current = null;
-        }
-        return;
-      }
-
-      const updates = await Promise.all(
-        pending.map(async (t) => {
-          const res = await apiClient.documents.getStatus(t.documentId!);
-          return { documentId: t.documentId!, status: res.success ? res.data?.status : undefined };
-        })
-      );
-
-      setTracked((prev) =>
-        prev.map((t) => {
-          const update = updates.find((u) => u.documentId === t.documentId);
-          return update?.status ? { ...t, status: update.status } : t;
-        })
-      );
-    }, 4000);
-  }
-
   async function handleUpload() {
     if (queuedFiles.length === 0) return;
 
@@ -148,21 +98,15 @@ export function BatchUploadPanel({ caseId, onUploaded }: BatchUploadPanelProps) 
       return;
     }
 
-    const newTracked: TrackedDocument[] = result.data.results.map((r) => ({
-      documentId: r.document?.id,
-      status: r.success ? r.document?.status || "processing" : "failed",
-    }));
+    const succeeded = result.data.results.filter((r) => r.success).length;
+    const failed = result.data.results.length - succeeded;
 
-    const succeeded = newTracked.filter((t) => t.status !== "failed").length;
-    const failed = newTracked.length - succeeded;
-
-    setTracked((prev) => [...prev, ...newTracked]);
     setQueuedFiles([]);
 
     if (succeeded > 0) {
-      setHasUploadedDocuments(true);
+      setUploadedCount(succeeded);
       toast.success(
-        `${succeeded} document${succeeded === 1 ? "" : "s"} uploaded. Processing started.`,
+        `${succeeded} document${succeeded === 1 ? "" : "s"} uploaded. Reading has started.`,
         "Upload Complete"
       );
       onUploaded?.();
@@ -179,8 +123,6 @@ export function BatchUploadPanel({ caseId, onUploaded }: BatchUploadPanelProps) 
         toast.error(`${fileResult.file_name}: ${fileResult.error}`, "Processing Queue Error");
       }
     }
-
-    startPolling();
   }
 
   return (
@@ -317,13 +259,19 @@ export function BatchUploadPanel({ caseId, onUploaded }: BatchUploadPanelProps) 
         </p>
       )}
 
-      {hasUploadedDocuments && tracked.length > 0 && tracked.every((t) => TERMINAL_STATUSES.includes(t.status)) && (
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4">
-          <p className="text-sm text-muted-foreground">Processing finished. Review the extracted information and flagged documents.</p>
-          <Button size="sm" onClick={() => router.push(`/review?caseId=${caseId}`)}>
-            Open review workspace
-            <ArrowRight size={14} data-icon="inline-end" />
-          </Button>
+      {uploadedCount > 0 && (
+        <div role="status" className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-accent px-4 py-3 text-sm text-accent-foreground">
+          <p>
+            <span className="font-semibold">{uploadedCount} uploaded.</span> Check names, numbers and dates against the
+            original before you approve.
+          </p>
+          <div className="flex shrink-0 gap-2">
+            <Button variant="ghost" size="sm" onClick={() => setUploadedCount(0)}>Dismiss</Button>
+            <Button size="sm" onClick={() => router.push(`/cases/${caseId}/review`)}>
+              Review
+              <ArrowRight size={14} data-icon="inline-end" />
+            </Button>
+          </div>
         </div>
       )}
     </div>

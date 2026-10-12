@@ -1,14 +1,18 @@
 "use client";
 
 import React, { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import { useParams } from "next/navigation";
-import { ArrowDown, ArrowUp, Download, FileText, Loader2, Pencil, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowRight, ArrowUp, FileText, Loader2, Pencil, Trash2 } from "lucide-react";
 import { apiClient, type CaseRecord, type ReportExcerpt } from "@/services/api/client";
 import { useToast } from "@/context/ToastContext";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { CaseStepper } from "@/components/case/CaseStepper";
+import { PageHeader } from "@/components/case/PageHeader";
+import { FormattedText } from "@/components/text/FormattedText";
 
 export function ReportBuilderPage() {
   const params = useParams();
@@ -17,7 +21,6 @@ export function ReportBuilderPage() {
 
   const [excerpts, setExcerpts] = useState<ReportExcerpt[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isExporting, setIsExporting] = useState(false);
   const [editingExcerptId, setEditingExcerptId] = useState<string | null>(null);
   const [draftText, setDraftText] = useState("");
   const [isSavingText, setIsSavingText] = useState(false);
@@ -109,19 +112,6 @@ export function ReportBuilderPage() {
     }
   }
 
-  async function handleExport() {
-    setIsExporting(true);
-    const result = await apiClient.reportBuilder.exportPdf(caseId);
-    setIsExporting(false);
-
-    if (result.success && result.data) {
-      window.open(result.data.download_url, "_blank", "noopener,noreferrer");
-      toast.success("Report exported. Download should start in a new tab.", "Export Complete");
-    } else {
-      toast.error(result.error || "Failed to export report", "Export Error");
-    }
-  }
-
   if (isLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
@@ -133,27 +123,29 @@ export function ReportBuilderPage() {
   return (
     <div className="min-h-screen bg-background px-4 py-8 md:px-6">
       <div className="mx-auto max-w-4xl">
-        <div className="mb-6 flex flex-wrap items-end justify-between gap-4 border-b pb-4">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Report Builder</p>
-            <h1 className="mt-1 text-3xl font-bold tracking-tight">
-              {caseDetails?.title || caseDetails?.property_name || "Untitled Case"}
-            </h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Excerpts selected from case documents, in the order they&apos;ll appear in the exported report.
-            </p>
-          </div>
-          <Button onClick={handleExport} disabled={isExporting || excerpts.length === 0} className="gap-2">
-            {isExporting ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
-            {isExporting ? "Exporting…" : "Export PDF"}
-          </Button>
-        </div>
+        <PageHeader
+          title={caseDetails?.title || caseDetails?.property_name || "Untitled Case"}
+          subtitle="In the order they appear in the report."
+          actions={
+            <>
+              <Button variant="outline" nativeButton={false} render={<Link href={`/cases/${caseId}/search`} />}>
+                Back to search
+              </Button>
+              <Button nativeButton={false} render={<Link href={`/cases/${caseId}/report`} />}>
+                Continue to report
+                <ArrowRight size={15} data-icon="inline-end" />
+              </Button>
+            </>
+          }
+        />
+
+        <CaseStepper caseId={caseId} current="search" />
 
         {excerpts.length === 0 ? (
           <Card>
             <CardContent className="py-12 text-center text-sm text-muted-foreground">
-              No excerpts yet. Go to the case workspace&apos;s search panel, expand a result, select text from
-              a page, and add it here.
+              Nothing selected yet. Go back to Search, pick your words, select text on a page and add it. You can
+              also continue without selections; the report will still list the documents and the chain of title.
             </CardContent>
           </Card>
         ) : (
@@ -232,9 +224,9 @@ export function ReportBuilderPage() {
                       </div>
                     </div>
                   ) : (
-                    <blockquote className="border-l-2 border-primary/40 pl-3 text-sm leading-relaxed text-foreground/90">
-                      {excerpt.excerpt_text}
-                    </blockquote>
+                    <div className="border-l-2 border-primary/40 pl-3 text-sm text-foreground/90">
+                      <FormattedText text={excerpt.excerpt_text} />
+                    </div>
                   )}
 
                   <Input

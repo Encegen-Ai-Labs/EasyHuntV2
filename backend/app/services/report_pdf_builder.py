@@ -181,3 +181,44 @@ def build_excerpt_report_pdf(case: Dict[str, Any], excerpts: List[Dict[str, Any]
     pdf_bytes = buffer.getvalue()
     buffer.close()
     return pdf_bytes
+
+
+def build_draft_pdf(draft) -> bytes:
+    """Writes an edited report draft (schemas.report_generation.ReportDraft,
+    title-search kind) as a PDF. Every text style uses the Unicode font so
+    Devanagari in an extract does not turn into black boxes (see the module
+    comment at the top)."""
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=40, leftMargin=40, topMargin=40, bottomMargin=40)
+    styles = getSampleStyleSheet()
+    title_style = ParagraphStyle("DraftTitle", parent=styles["Heading1"], fontName=_FONT_NAME, fontSize=18, alignment=1, spaceAfter=14)
+    heading_style = ParagraphStyle("DraftHeading", parent=styles["Heading2"], fontName=_FONT_NAME, fontSize=13, spaceBefore=12, spaceAfter=6)
+    body_style = ParagraphStyle("DraftBody", parent=styles["Normal"], fontName=_FONT_NAME, fontSize=10.5, leading=15, spaceAfter=6)
+    cell_style = ParagraphStyle("DraftCell", parent=styles["Normal"], fontName=_FONT_NAME, fontSize=9, leading=12)
+
+    def paragraph(text: str, style) -> Paragraph:
+        return Paragraph(_escape(text).replace("\n", "<br/>"), style)
+
+    story = [paragraph(draft.title.upper(), title_style)]
+    for section in draft.sections:
+        story.append(paragraph(section.heading, heading_style))
+        for block in section.blocks:
+            if block.type == "table" and block.columns:
+                width = len(block.columns)
+                rows = [[paragraph(c, cell_style) for c in block.columns]]
+                rows += [
+                    [paragraph(row[i] if i < len(row) else "", cell_style) for i in range(width)]
+                    for row in block.rows
+                ]
+                table = Table(rows, colWidths=[500 / width] * width, repeatRows=1)
+                table.setStyle(TableStyle([
+                    ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#F3F4F6")),
+                    ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#9CA3AF")),
+                    ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                ]))
+                story.append(table)
+                story.append(Spacer(1, 8))
+            elif (block.text or "").strip():
+                story.append(paragraph(block.text, body_style))
+    doc.build(story)
+    return buffer.getvalue()

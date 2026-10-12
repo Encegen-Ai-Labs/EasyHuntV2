@@ -79,7 +79,7 @@ class FakeDocRepo:
 
     def list_reviewable_by_case(self, case_id):
         return [self.doc] if self.doc.get("case_id") == case_id and self.doc.get("status") in {
-            "llm_done", "flagged", "under_review"
+            "llm_done", "flagged", "under_review", "approved", "rejected", "completed"
         } else []
 
 

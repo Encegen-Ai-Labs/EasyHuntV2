@@ -16,3 +16,7 @@ Parked, not scheduled: OCR language-pack expansion (D4 — defer until a real ca
 ## Why this order
 
 Phase 1 first because it's the largest genuine gap against the SOP (§5–6) and everything downstream (Phase 2's UI) is more useful to review with real, non-hardcoded flag data to look at. Phase 2 depends on Phase 1 for exactly that reason — reviewing an empty-state flags panel tells you much less than reviewing one with real LLM-derived and structural flags side by side. Phase 3 depends on Phase 2 specifically because it deletes the current placeholder `RiskFlagsPanel.tsx`, which should only happen once its replacement exists and works. Phase 4 is fully independent (a one-file UI change) and could run any time, but comes last since it's the lowest-stakes item and there's no cost to sequencing it after the others.
+
+## Attorney flow rebuild (2026-10-12)
+
+Built from the approved 8-step flow (SOP.md, DECISIONS.md D10): table-safe extraction text, per-document approve/undo, approved-only search with an exact/similar word picker, selections page, report page (Title Search + 9 bank formats, in-browser editing, approve, Word/PDF), admin link and "Lawyer" wording, upload "check the fields" notice, case step bar. Backend suite 343 passing, frontend 24 vitest tests, `next build` clean. **Not yet checked by hand** end to end in a browser with real documents.

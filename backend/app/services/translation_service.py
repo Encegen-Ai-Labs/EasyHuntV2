@@ -5,6 +5,7 @@ import httpx
 from dotenv import load_dotenv
 
 from app.services.page_extraction_service import strip_annotation_tags
+from app.services.text_cleanup import clean_page_text
 
 load_dotenv()
 
@@ -57,7 +58,7 @@ def translate_to_english(text: str) -> Dict[str, Any]:
             response.raise_for_status()
             data = response.json()
 
-        translated = data["data"]["translations"][0]["translatedText"]
+        translated = clean_page_text(data["data"]["translations"][0]["translatedText"])
         return {"success": True, "translated_text": translated, "error": None}
     except httpx.HTTPStatusError as e:
         # Google's error body (e.g. {"error": {"message": "API key not valid", ...}})

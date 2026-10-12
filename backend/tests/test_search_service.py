@@ -19,7 +19,7 @@ class FakeCaseRepo:
 
 class FakeDocRepo:
     def __init__(self, docs=None):
-        self.docs = docs or [{"id": "doc-1", "case_id": "case-1", "file_name": "sale_deed.pdf"}]
+        self.docs = docs or [{"id": "doc-1", "case_id": "case-1", "file_name": "sale_deed.pdf", "status": "approved"}]
 
     def list_by_case(self, case_id):
         return [d for d in self.docs if d.get("case_id") == case_id]

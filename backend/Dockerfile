@@ -15,6 +15,8 @@ RUN apt-get update \
         tesseract-ocr-tam \
         tesseract-ocr-tel \
         tesseract-ocr-kan \
+        libreoffice-writer \
+        fonts-noto-core \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -22,6 +24,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 COPY app ./app
 COPY migrations ./migrations
+COPY scripts ./scripts
 COPY templates ./templates
 
 # Run as an unprivileged user (Celery warns against root workers).

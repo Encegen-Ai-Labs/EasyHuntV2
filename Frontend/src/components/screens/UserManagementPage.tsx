@@ -86,14 +86,14 @@ export function UserManagementPage() {
         organisation_name: newOrg,
       });
 
-      toast.success(`Reviewer account created for ${res.email}`, "Reviewer Created");
+      toast.success(`Lawyer account created for ${res.email}`, "Lawyer Created");
       setIsAddModalOpen(false);
       setNewEmail("");
       setNewPassword("");
       setNewOrg("");
       loadData();
     } catch (err: any) {
-      toast.error(err.message || "Failed to create reviewer account", "Error");
+      toast.error(err.message || "Failed to create the lawyer account", "Error");
     } finally {
       setIsSubmittingReviewer(false);
     }
@@ -106,10 +106,10 @@ export function UserManagementPage() {
     try {
       await apiClient.admin.assignReviewer(caseId, reviewerId);
       const caseTitle = cases.find((c) => c.id === caseId)?.title || "case";
-      toast.success(`Reassigned ${caseTitle} to reviewer`, "Reviewer Assigned");
+      toast.success(`Reassigned ${caseTitle} to the lawyer`, "Lawyer Assigned");
       loadData();
     } catch (err: any) {
-      toast.error(err.message || "Failed to assign reviewer", "Assignment Error");
+      toast.error(err.message || "Failed to assign the lawyer", "Assignment Error");
     } finally {
       setAssigningCaseId(null);
     }
@@ -142,7 +142,7 @@ export function UserManagementPage() {
             </Button>
             <Button size="sm" onClick={() => setIsAddModalOpen(true)} className="gap-1.5">
               <UserPlus size={16} />
-              Add Reviewer
+              Add Lawyer
             </Button>
           </div>
         </div>
@@ -153,7 +153,7 @@ export function UserManagementPage() {
             <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
               <div>
                 <CardTitle className="text-lg">User Directory</CardTitle>
-                <CardDescription>System accounts across Reviewer and Admin roles.</CardDescription>
+                <CardDescription>Lawyer and Admin accounts. Only an Admin can create accounts.</CardDescription>
               </div>
               <div className="relative">
                 <Search className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
@@ -202,7 +202,7 @@ export function UserManagementPage() {
                           variant={u.role.toLowerCase() === "admin" ? "destructive" : "default"}
                           className="text-[10px] font-bold uppercase"
                         >
-                          {u.role}
+                          {u.role === "Reviewer" ? "Lawyer" : u.role}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-sm font-medium">
@@ -227,8 +227,8 @@ export function UserManagementPage() {
         {/* Case Assignment Dropdown Table */}
         <Card>
           <CardHeader className="border-b">
-            <CardTitle className="text-lg">Case Reviewer Assignments</CardTitle>
-            <CardDescription>Directly assign property cases to qualified reviewers.</CardDescription>
+            <CardTitle className="text-lg">Case Assignments</CardTitle>
+            <CardDescription>Assign each property case to a lawyer.</CardDescription>
           </CardHeader>
           <CardContent className="p-0">
             <Table>
@@ -237,7 +237,7 @@ export function UserManagementPage() {
                   <TableHead>Case Title</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Current Assignee</TableHead>
-                  <TableHead>Assign Reviewer</TableHead>
+                  <TableHead>Assign to</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -264,7 +264,7 @@ export function UserManagementPage() {
                           onChange={(e) => handleAssignReviewer(c.id, e.target.value)}
                           disabled={assigningCaseId === c.id}
                         >
-                          <option value="" disabled>Select Reviewer…</option>
+                          <option value="" disabled>Select a lawyer…</option>
                           {reviewers.map((r) => (
                             <option key={r.id} value={r.id}>
                               {r.email} ({r.organisation_name || r.role})
@@ -292,19 +292,19 @@ export function UserManagementPage() {
                   <UserPlus size={20} />
                 </span>
                 <div>
-                  <h3 className="text-lg font-bold">Add Reviewer Account</h3>
-                  <p className="text-xs text-muted-foreground">POST /api/v1/admin/reviewers</p>
+                  <h3 className="text-lg font-bold">Add Lawyer Account</h3>
+                  <p className="text-xs text-muted-foreground">The lawyer signs in with this email and password.</p>
                 </div>
               </div>
 
               <form onSubmit={handleAddReviewer} className="mt-5 flex flex-col gap-4">
                 <div className="flex flex-col gap-1.5">
                   <label className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-                    Reviewer Email
+                    Lawyer email
                   </label>
                   <Input
                     type="email"
-                    placeholder="reviewer@auditfirm.com"
+                    placeholder="name@lawfirm.com"
                     value={newEmail}
                     onChange={(e) => setNewEmail(e.target.value)}
                     required
@@ -353,7 +353,7 @@ export function UserManagementPage() {
                         Creating Account…
                       </>
                     ) : (
-                      "Create Reviewer"
+                      "Create Lawyer"
                     )}
                   </Button>
                 </div>

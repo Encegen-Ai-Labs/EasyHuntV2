@@ -15,6 +15,7 @@ from typing import Any, Dict, List
 from app.core.config import settings
 from app.ocr.factory import get_ocr_provider
 from app.services.page_extraction_service import extract_page_text, extract_page_text_and_fields
+from app.services.text_cleanup import clean_page_text
 
 
 def _analyze_page(image_bytes: bytes) -> Dict[str, Any]:
@@ -80,7 +81,7 @@ def route_and_extract_page(
                 )
             return {
                 "page_number": page_number,
-                "original_text": ocr_result.full_text,
+                "original_text": clean_page_text(ocr_result.full_text),
                 "source": "ocr",
                 "confidence": round(ocr_result.overall_confidence, 4),
                 "has_handwriting": handwritten_box_count > 0,
@@ -117,7 +118,7 @@ def route_and_extract_page(
 
     return {
         "page_number": page_number,
-        "original_text": vlm_result["text"],
+        "original_text": clean_page_text(vlm_result["text"]),
         "source": "vlm",
         "confidence": None,  # the plain-text transcription prompt doesn't self-report confidence
         "has_handwriting": analysis["handwritten_ratio"] >= settings.ROUTER_HANDWRITING_THRESHOLD,

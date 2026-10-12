@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, FileCheck2, Home, ListChecks, LogOut, UserRound } from "lucide-react";
+import { BarChart3, Home, ListChecks, LogOut, ShieldCheck, UserRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { cn } from "@/lib/utils";
@@ -21,29 +21,25 @@ const navItems = [
   { href: "/cases", label: "Cases", icon: ListChecks },
 ];
 
+// Shown only to an Admin: create lawyer accounts and assign cases.
+const adminNavItem = { href: "/admin/users", label: "Admin", icon: ShieldCheck };
+
 export function AppNavigation() {
   const pathname = usePathname();
   const { user, isAuthenticated, isLoading, logout } = useAuth();
+  const items = user?.role === "Admin" ? [...navItems, adminNavItem] : navItems;
 
   return (
-    <header className="sticky top-0 z-50 border-b bg-background/80 backdrop-blur-md">
+    <header className="sticky top-0 z-50 border-b bg-background">
       <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-3">
-        <Link href="/" className="flex items-center gap-2.5">
-          <span className="flex size-9 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-            <FileCheck2 size={18} />
-          </span>
-          <div>
-            <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-              EasyHuntV2
-            </div>
-            <div className="text-sm font-semibold leading-none">Risk Intelligence</div>
-          </div>
+        <Link href="/" className="font-heading text-xl font-medium tracking-tight">
+          EasyHunt
         </Link>
 
         <nav className="hidden items-center gap-1 md:flex">
-          {navItems.map((item) => {
+          {items.map((item) => {
             const Icon = item.icon;
-            const isActive = pathname === item.href;
+            const isActive = pathname === item.href || (item.href !== "/" && pathname.startsWith(`${item.href}/`));
             return (
               <Link
                 key={item.href}
@@ -70,10 +66,6 @@ export function AppNavigation() {
                 <UserRound size={13} />
                 {user?.email}
               </span>
-              <Button size="sm" nativeButton={false} render={<Link href="/dashboard" />}>
-                <BarChart3 data-icon="inline-start" />
-                Workspace
-              </Button>
               <Button variant="ghost" size="sm" onClick={() => logout()}>
                 <LogOut data-icon="inline-start" />
                 Logout
@@ -83,10 +75,6 @@ export function AppNavigation() {
             <>
               <Button variant="ghost" size="sm" className="hidden md:inline-flex" nativeButton={false} render={<Link href="/login" />}>
                 Login
-              </Button>
-              <Button size="sm" nativeButton={false} render={<Link href="/login" />}>
-                <UserRound data-icon="inline-start" />
-                Workspace
               </Button>
             </>
           )}

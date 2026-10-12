@@ -1,6 +1,14 @@
 from typing import Dict, Any, Optional, List
 from app.repositories.base import BaseRepository
 
+# A lawyer-approved document: usable for search and for reports. "completed" is
+# what finalize_review() sets on an approved case's documents.
+APPROVED_STATUSES = {"approved", "completed"}
+# Documents the review screen lists: finished processing, whether or not the
+# lawyer has decided yet, so an approval can be seen and undone.
+REVIEWABLE_STATUSES = {"llm_done", "flagged", "under_review", "approved", "rejected", "completed"}
+
+
 class DocumentRepository(BaseRepository):
     def create_document(self, doc_data: Dict[str, Any]) -> Dict[str, Any]:
         return self.insert("documents", doc_data)
@@ -23,5 +31,12 @@ class DocumentRepository(BaseRepository):
         return [
             document
             for document in self.list_by_case(case_id)
-            if document.get("status") in {"llm_done", "flagged", "under_review"}
+            if document.get("status") in REVIEWABLE_STATUSES
+        ]
+
+    def list_approved_by_case(self, case_id: str) -> List[Dict[str, Any]]:
+        return [
+            document
+            for document in self.list_by_case(case_id)
+            if document.get("status") in APPROVED_STATUSES
         ]

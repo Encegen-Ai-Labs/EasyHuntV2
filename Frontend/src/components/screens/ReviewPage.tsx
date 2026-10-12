@@ -1,12 +1,14 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { AlertTriangle, CheckCircle2, Clock, Eye, FileStack, FileWarning, Languages, Loader2, Pencil } from "lucide-react";
+import Link from "next/link";
+import { useParams, useSearchParams } from "next/navigation";
+import { AlertTriangle, ArrowRight, CheckCircle2, Clock, Eye, FileWarning, Languages, Loader2, Pencil, Undo2 } from "lucide-react";
 import {
   useCaseById,
   useDocumentPages,
   useEnhancedPageImageMutation,
+  useReopenDocumentMutation,
   useReviewDocuments,
   useSubmitDocumentReviewMutation,
   useTranslateDocumentMutation,
@@ -15,11 +17,12 @@ import {
 import type { DocumentRecord, ExtractionRecord } from "@/services/api/client";
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/context/ToastContext";
-import { apiClient } from "@/services/api/client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { SelectableText } from "@/components/search/SelectableText";
+import { FormattedText } from "@/components/text/FormattedText";
+import { CaseStepper } from "@/components/case/CaseStepper";
+import { PageHeader } from "@/components/case/PageHeader";
 
 // Keys the extraction prompt (backend/app/services/llm_extractor.py) returns
 // alongside every field, e.g. "owner_name_confidence" — paired up with their
@@ -66,10 +69,22 @@ function statusMeta(doc: DocumentRecord, extraction: ExtractionRecord | null) {
   }
 }
 
+function documentStatusLabel(doc: DocumentRecord, extraction: ExtractionRecord | null) {
+  if (doc.status === "approved" || doc.status === "completed") {
+    return { label: "Approved", variant: "secondary" as const };
+  }
+  if (doc.status === "rejected") return { label: "Flagged for correction", variant: "destructive" as const };
+  if (!extraction) {
+    return doc.status === "flagged"
+      ? { label: "Needs attention", variant: "destructive" as const }
+      : { label: "Reading…", variant: "outline" as const };
+  }
+  return { label: "Needs your review", variant: "outline" as const };
+}
+
 export function ReviewPage() {
   const params = useParams();
   const searchParams = useSearchParams();
-  const router = useRouter();
   const toast = useToast();
   const { user } = useAuth();
   const isAdmin = user?.role === "Admin";
@@ -86,8 +101,9 @@ export function ReviewPage() {
   const { data, isLoading, isError, error } = useReviewDocuments(caseId);
   const entries = useMemo(() => data?.data ?? [], [data]);
   const submitReview = useSubmitDocumentReviewMutation();
+  const reopenDocument = useReopenDocumentMutation();
 
-  const [activeDocId, setActiveDocId] = useState<string | null>(null);
+  const [activeDocId, setActiveDocId] = useState<string | null>(searchParams?.get("doc") ?? null);
   const [reviewNotes, setReviewNotes] = useState("");
   const [isEditingFields, setIsEditingFields] = useState(false);
   const [editedFields, setEditedFields] = useState<Record<string, any> | null>(null);
@@ -103,8 +119,8 @@ export function ReviewPage() {
   const [editedEnglishText, setEditedEnglishText] = useState("");
   const [initialOriginalText, setInitialOriginalText] = useState("");
   const [initialEnglishText, setInitialEnglishText] = useState("");
-  const [isAddingExcerpt, setIsAddingExcerpt] = useState(false);
 
+  const approvedCount = entries.filter((e) => e.document.status === "approved" || e.document.status === "completed").length;
   const active = entries.find((e) => e.document.id === activeDocId) ?? entries[0] ?? null;
 
   // Discard any in-progress edits when switching documents — they were never
@@ -204,27 +220,6 @@ export function ReviewPage() {
     }
   }
 
-  async function handleAddPageExcerpt(pageNumber: number, excerptText: string | null) {
-    if (!excerptText || !active) {
-      toast.warning("Select text from a page first.", "Nothing Selected");
-      return;
-    }
-
-    setIsAddingExcerpt(true);
-    const result = await apiClient.reportBuilder.addExcerpt(caseId, {
-      document_id: active.document.id,
-      page_number: pageNumber,
-      excerpt_text: excerptText,
-    });
-    setIsAddingExcerpt(false);
-
-    if (result.success) {
-      toast.success("Selected text added to the report workspace.", "Excerpt Added");
-    } else {
-      toast.error(result.error || "Failed to add selected text", "Error");
-    }
-  }
-
   async function handleDecision(decision: "approved" | "rejected") {
     if (!active?.extraction) return;
     const result = await submitReview.mutateAsync({
@@ -243,24 +238,18 @@ export function ReviewPage() {
       setFieldReasons({});
       setIsEditingFields(false);
       setEditedFields(null);
-
-      // Once the whole case has nothing left to review, move the reviewer
-      // straight to the report builder / export flow instead of leaving
-      // them on a now-empty review screen. `entries` here is the
-      // pre-approval snapshot (the invalidated query hasn't refetched yet
-      // within this same call), so explicitly exclude the document just
-      // approved rather than relying on its (still stale) reviewed_at.
-      if (decision === "approved") {
-        const stillNeedsReview = entries.some(
-          (e) => e.document.id !== active.document.id && e.extraction && !e.extraction.reviewed_at
-        );
-        if (!stillNeedsReview) {
-          toast.success("All documents reviewed — opening the report builder.", "Case Ready for Export");
-          router.push(`/cases/${caseId}/report-builder`);
-        }
-      }
     } else {
       toast.error(result.error || "Failed to save review", "Error");
+    }
+  }
+
+  async function handleUndoApproval() {
+    if (!active) return;
+    const result = await reopenDocument.mutateAsync({ documentId: active.document.id, caseId });
+    if (result.success) {
+      toast.success("Approval undone. You can edit this document again.", "Reopened");
+    } else {
+      toast.error(result.error || "Could not undo the approval", "Error");
     }
   }
 
@@ -285,7 +274,7 @@ export function ReviewPage() {
   if (!caseId) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background px-4">
-        <p className="text-sm text-muted-foreground">No case selected. Open a case and click &ldquo;Open Review Workspace&rdquo;.</p>
+        <p className="text-sm text-muted-foreground">No case selected. Open a case from the Cases list.</p>
       </div>
     );
   }
@@ -293,23 +282,24 @@ export function ReviewPage() {
   return (
     <div className="min-h-screen bg-background px-4 py-6">
       <div className="mx-auto max-w-[1800px]">
-        <header className="mb-6 flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Extraction Review</p>
-            <h1 className="mt-1 text-2xl font-bold tracking-tight">
-              {caseDetails?.title || caseDetails?.property_name || "Case Review"}
-            </h1>
-          </div>
-          {/* Moved here from the upload page (CaseWorkspacePage.tsx) —
-           * building a report belongs alongside document approval, and
-           * staying reachable here (not just via the auto-redirect after the
-           * last approval) means a reviewer who navigates away can still
-           * get back to it. */}
-          <Button variant="outline" size="sm" onClick={() => router.push(`/cases/${caseId}/report-builder`)}>
-            <FileStack size={14} data-icon="inline-start" />
-            Report Builder
-          </Button>
-        </header>
+        <PageHeader
+          title={caseDetails?.title || caseDetails?.property_name || "Case Review"}
+          
+        />
+
+        <CaseStepper caseId={caseId} current="review" />
+
+        <div className="mb-5 flex flex-wrap items-center justify-between gap-3 text-sm">
+          <p className="text-muted-foreground">
+            Compare each field with the original and correct anything wrong, then approve.
+          </p>
+          {approvedCount > 0 && (
+            <Button nativeButton={false} render={<Link href={`/cases/${caseId}/search`} />}>
+              Search {approvedCount} approved
+              <ArrowRight size={15} data-icon="inline-end" />
+            </Button>
+          )}
+        </div>
 
         {isLoading && (
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -326,7 +316,7 @@ export function ReviewPage() {
 
         {!isLoading && !isError && entries.length === 0 && (
           <p className="text-sm text-muted-foreground">
-            No documents have been uploaded to this case yet. Upload documents from the case workspace first.
+            No documents have been uploaded to this case yet. Go back to Upload and add some first.
           </p>
         )}
 
@@ -352,7 +342,10 @@ export function ReviewPage() {
                   >
                     <span className="truncate font-medium">{document.file_name}</span>
                     <span className="flex items-center gap-1.5">
-                      <Badge variant="secondary" className="text-[10px]">{document.status}</Badge>
+                      {(() => {
+                        const status = documentStatusLabel(document, extraction);
+                        return <Badge variant={status.variant} className="text-[10px]">{status.label}</Badge>;
+                      })()}
                       {extraction?.has_handwritten_content && (
                         <span title="Contains handwritten content"><AlertTriangle size={11} className="text-amber-500" /></span>
                       )}
@@ -516,19 +509,28 @@ export function ReviewPage() {
                     {currentFields.full_text && (
                       <details className="rounded-lg border border-border p-3">
                         <summary className="cursor-pointer text-xs font-semibold">Full verbatim transcription</summary>
-                        <p className="mt-2 whitespace-pre-wrap text-xs text-muted-foreground">
-                          {currentFields.full_text}
-                        </p>
+                        <FormattedText text={String(currentFields.full_text)} className="mt-2 text-xs text-muted-foreground" />
                       </details>
                     )}
 
                     <div className="flex flex-col gap-2 border-t border-border pt-3">
                       {active.extraction.reviewed_at ? (
-                        <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                          <CheckCircle2 size={13} />
-                          Reviewed {new Date(active.extraction.reviewed_at).toLocaleString()}
-                          {active.extraction.status ? ` — ${active.extraction.status}` : ""}
-                        </p>
+                        <>
+                          <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                            <CheckCircle2 size={13} />
+                            Reviewed {new Date(active.extraction.reviewed_at).toLocaleString()}
+                            {active.extraction.status ? ` — ${active.extraction.status}` : ""}
+                          </p>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={reopenDocument.isPending}
+                            onClick={handleUndoApproval}
+                          >
+                            <Undo2 size={13} data-icon="inline-start" />
+                            {reopenDocument.isPending ? "Undoing…" : "Undo and edit again"}
+                          </Button>
+                        </>
                       ) : (
                         <>
                           <textarea
@@ -643,13 +645,7 @@ export function ReviewPage() {
                           />
                         ) : (
                           page.original_text ? (
-                            <SelectableText
-                              text={page.original_text}
-                              query=""
-                              disabled={isAddingExcerpt}
-                              addLabel="Add selected text to report"
-                              onAddSelection={(text) => void handleAddPageExcerpt(page.page_number, text)}
-                            />
+                            <FormattedText text={page.original_text} className="text-sm" />
                           ) : (
                             <p className="text-sm text-muted-foreground">—</p>
                           )
@@ -665,13 +661,7 @@ export function ReviewPage() {
                             className="min-h-[120px] w-full rounded-lg border border-input bg-transparent px-2.5 py-1.5 text-sm outline-none transition-colors placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30"
                           />
                         ) : page.english_text ? (
-                          <SelectableText
-                            text={page.english_text}
-                            query=""
-                            disabled={isAddingExcerpt}
-                            addLabel="Add selected text to report"
-                            onAddSelection={(text) => void handleAddPageExcerpt(page.page_number, text)}
-                          />
+                          <FormattedText text={page.english_text} className="text-sm" />
                         ) : (
                           <p className="text-sm text-muted-foreground">Not translated yet.</p>
                         )}

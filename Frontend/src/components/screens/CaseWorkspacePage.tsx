@@ -1,125 +1,80 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
-import { ArrowRight, MapPin, Search as SearchIcon, UploadCloud } from "lucide-react";
-import { apiClient, type CaseRecord } from "@/services/api/client";
-import { useToast } from "@/context/ToastContext";
+import React from "react";
+import Link from "next/link";
+import { useParams } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
+import { ArrowRight, UploadCloud } from "lucide-react";
+import { useCaseById, useCaseProgress } from "@/services/api/hooks";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { BatchUploadPanel } from "@/components/upload/BatchUploadPanel";
 import { DocumentList } from "@/components/case/DocumentList";
 import { RiskFlagsPanel } from "@/components/case/RiskFlagsPanel";
-import { CaseSearchPanel } from "@/components/search/CaseSearchPanel";
+import { CaseStepper } from "@/components/case/CaseStepper";
+import { PageHeader } from "@/components/case/PageHeader";
 
 export function CaseWorkspacePage() {
   const params = useParams();
-  const router = useRouter();
   const caseId = (params?.id as string) || "";
-  const toast = useToast();
+  const queryClient = useQueryClient();
 
-  const [caseDetails, setCaseDetails] = useState<CaseRecord | null>(null);
-  const [isLoadingCase, setIsLoadingCase] = useState<boolean>(true);
-  const [documentListKey, setDocumentListKey] = useState(0);
+  const { data: caseData } = useCaseById(caseId);
+  const caseDetails = caseData?.data;
+  const { total, processing, readyToReview, approved } = useCaseProgress(caseId);
 
-  // Load Case Details
-  useEffect(() => {
-    async function loadCase() {
-      setIsLoadingCase(true);
-      try {
-        const result = await apiClient.cases.getById(caseId);
-        setCaseDetails(result.data);
-      } catch (err: any) {
-        toast.error(err.message || "Failed to load case details", "Error");
-      } finally {
-        setIsLoadingCase(false);
-      }
-    }
-    loadCase();
-  }, [caseId]);
+  const readyCount = total - processing;
 
   return (
     <div className="min-h-screen bg-background px-4 py-8 md:px-6">
-      <div className="mx-auto max-w-6xl">
-        {/* Page header */}
-        <div className="mb-6 flex flex-wrap items-center justify-between gap-4 border-b pb-4">
-          <div>
-            <div className="flex items-center gap-2">
-              <Badge variant="secondary">{caseDetails?.status || "Draft"}</Badge>
-            </div>
-            <h1 className="mt-1 text-3xl font-bold tracking-tight">
-              {caseDetails?.title || caseDetails?.property_name || "Case Workspace"}
-            </h1>
-            <p className="mt-1 text-xs text-muted-foreground flex items-center gap-3">
-              <span className="flex items-center gap-1"><MapPin size={13} /> {caseDetails?.address || caseDetails?.location || "Location not set"}</span>
-            </p>
-          </div>
+      <div className="mx-auto max-w-5xl">
+        <PageHeader
+          title={caseDetails?.title || caseDetails?.property_name || "Case Workspace"}
+          subtitle={caseDetails?.address || caseDetails?.location || "Location not set"}
+        />
 
-          <div className="flex items-center gap-2">
-            {/* Report Builder moved to the review workspace (ReviewPage.tsx)
-             * — it belongs alongside document approval, not the upload step,
-             * since building a report only makes sense once there's
-             * something reviewed to cite. */}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => router.push(`/review?caseId=${caseId}`)}
-            >
-              Open Review Workspace
-              <ArrowRight size={14} data-icon="inline-end" />
-            </Button>
-          </div>
-        </div>
+        <CaseStepper caseId={caseId} current="upload" />
 
-        {/* Document Ingestion */}
         <Card>
           <CardHeader className="border-b">
-            <CardTitle className="text-lg flex items-center gap-2">
+            <CardTitle className="flex items-center gap-2 text-lg">
               <UploadCloud size={20} className="text-primary" />
-              Case Document Ingestion
+              Upload documents
             </CardTitle>
-            <CardDescription>
-              Upload up to 20 legal deeds, title insurance policies, tax filings, or survey maps at once (PDF/PNG/JPG, under 10MB each).
-            </CardDescription>
           </CardHeader>
-
           <CardContent className="pt-6">
-            <BatchUploadPanel caseId={caseId} onUploaded={() => setDocumentListKey((k) => k + 1)} />
+            <BatchUploadPanel
+              caseId={caseId}
+              onUploaded={() => queryClient.invalidateQueries({ queryKey: ["documents", caseId, "list"] })}
+            />
           </CardContent>
         </Card>
 
-        {/* Documents */}
         <Card className="mt-6">
           <CardHeader className="border-b">
             <CardTitle className="text-lg">Documents</CardTitle>
-            <CardDescription>Every document uploaded to this case and its processing status.</CardDescription>
           </CardHeader>
           <CardContent className="pt-6">
-            <DocumentList caseId={caseId} refreshKey={documentListKey} />
+            <DocumentList caseId={caseId} />
           </CardContent>
         </Card>
 
-        {/* Risk flags */}
+        {total > 0 && (
+          <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-5">
+            <p className="text-sm text-muted-foreground">
+              {readyCount} of {total} read{approved > 0 ? ` · ${approved} approved` : ""}
+              {readyToReview > 0 && approved > 0 ? ` · ${readyToReview} to review` : ""}
+            </p>
+            <Button nativeButton={false} render={<Link href={`/cases/${caseId}/review`} />} disabled={readyCount === 0}>
+              Review documents
+              <ArrowRight size={15} data-icon="inline-end" />
+            </Button>
+          </div>
+        )}
+
         <div className="mt-6">
           <RiskFlagsPanel caseId={caseId} />
         </div>
-
-        {/* Search */}
-        <Card className="mt-6">
-          <CardHeader className="border-b">
-            <CardTitle className="text-lg flex items-center gap-2">
-              <SearchIcon size={20} className="text-primary" />
-              Search Case Documents
-            </CardTitle>
-            <CardDescription>
-              Search exact words or find semantically related passages in the case documents.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="pt-6">
-            <CaseSearchPanel caseId={caseId} />
-          </CardContent>
-        </Card>
       </div>
     </div>
   );

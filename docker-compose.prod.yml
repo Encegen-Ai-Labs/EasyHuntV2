@@ -1,0 +1,20 @@
+# Production override. Used together with docker-compose.yml by deploy/deploy.sh:
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+# It runs the published image for an exact commit instead of building on the server,
+# and keeps the API off the public network: a reverse proxy on the same machine
+# (Caddy or nginx, which also terminates HTTPS) is the only thing that talks to it.
+# Needs Docker Compose 2.24 or newer (for the !override tag).
+services:
+  api:
+    image: ${IMAGE}:${IMAGE_TAG}
+    pull_policy: always
+    ports: !override
+      - "127.0.0.1:8000:8000"
+    environment:
+      APP_ENV: production
+      TRUST_PROXY: "true"
+  worker:
+    image: ${IMAGE}:${IMAGE_TAG}
+    pull_policy: always
+    environment:
+      APP_ENV: production

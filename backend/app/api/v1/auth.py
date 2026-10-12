@@ -3,6 +3,7 @@ from typing import Any, Dict
 from fastapi import APIRouter, Depends
 
 from app.core.exceptions import AuthenticationError
+from app.core.rate_limiting import limit_ip
 from app.core.security import create_access_token, verify_password
 from app.dependencies.db import get_supabase_service_client
 from app.repositories.user_repo import UserRepository
@@ -18,7 +19,7 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 # authenticated request failed).
 
 
-@router.post("/login")
+@router.post("/login", dependencies=[Depends(limit_ip("login", "RATE_LIMIT_LOGIN"))])
 async def login_user(
     payload: UserLogin,
     db: Client = Depends(get_supabase_service_client),

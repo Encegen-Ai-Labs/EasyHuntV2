@@ -1,6 +1,8 @@
 from fastapi import Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi import Request
 from jose import jwt, JWTError
+from app.core import context
 from app.core.config import settings
 from app.core.exceptions import AuthenticationError, PermissionDeniedError
 from app.repositories.user_repo import UserRepository
@@ -11,12 +13,13 @@ from typing import Dict, Any, List
 security_bearer = HTTPBearer()
 
 def get_current_user(
+    request: Request,
     credentials: HTTPAuthorizationCredentials = Depends(security_bearer),
     db: Client = Depends(get_supabase_service_client)
 ) -> Dict[str, Any]:
     token = credentials.credentials
     try:
-        payload = jwt.decode(token, settings.SUPABASE_JWT_SECRET, algorithms=[settings.ALGORITHM])
+        payload = jwt.decode(token, settings.jwt_signing_secret, algorithms=[settings.ALGORITHM])
         user_id: str = payload.get("sub")
         role: str = payload.get("role")
         if user_id is None or role is None:
@@ -29,6 +32,9 @@ def get_current_user(
     user = repo.get_by_id(user_id)
     if not user:
         raise AuthenticationError("User not registered in local schema")
+    # Every log line and usage record from here on carries who this was.
+    request.state.user_id = str(user["id"])
+    context.bind(user_id=str(user["id"]))
     return user
 
 class RoleRequirement:

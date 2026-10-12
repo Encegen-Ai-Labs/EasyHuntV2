@@ -1,4 +1,5 @@
-"""Strip stray `<br>` tags and non-table `|` characters from text already stored.
+"""Strip stray `<br>` tags, non-table `|` characters and leaked secrets (API keys in old
+error messages) from text already stored.
 
 Usage (from the api container, in /app, or backend/ locally):
     python -m scripts.clean_existing_text            # dry run: counts only, writes nothing
@@ -15,6 +16,7 @@ Only rows whose text actually changes are written. Re-running is harmless.
 import sys
 from typing import Any, Dict, List
 
+from app.core.redaction import redact
 from app.services.text_cleanup import clean_page_text
 
 PAGE_FIELDS = ("original_text", "english_text")
@@ -36,7 +38,8 @@ def page_updates(row: Dict[str, Any]) -> Dict[str, str]:
     updates: Dict[str, str] = {}
     for field in PAGE_FIELDS:
         value = row.get(field)
-        cleaned = clean_page_text(value)
+        # Also removes any API key or token that an old error message saved into the text.
+        cleaned = clean_page_text(redact(value)) if value else value
         if value and cleaned != value:
             updates[field] = cleaned
     return updates

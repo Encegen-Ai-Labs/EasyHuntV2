@@ -18,6 +18,8 @@ from app.dependencies.auth import RoleRequirement
 from app.core.exceptions import PropertySystemException, ResourceNotFoundError
 from supabase import Client
 from typing import Any, Dict, List
+from app.core.rate_limiting import limit_ip, limit_user
+from app.services.llm_usage import ensure_within_budget
 
 router = APIRouter(prefix="/documents", tags=["Document Infrastructure"])
 
@@ -44,7 +46,12 @@ def list_documents(
     service.authorize_case_access(case_id, current_user)
     return service.doc_repo.list_by_case(case_id)
 
-@router.post("/upload", response_model=BatchUploadResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/upload",
+    response_model=BatchUploadResponse,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(limit_user("upload", "RATE_LIMIT_UPLOAD")), Depends(ensure_within_budget)],
+)
 async def upload_documents(
     case_id: str = Form(...),
     files: List[UploadFile] = File(...),
@@ -270,7 +277,11 @@ def _record_page_corrections(service, document, current_user, page_number, previ
     except Exception as e:
         logger.error("documents.page_correction_record_failed | document_id=%s error=%s", document.get("id"), e)
 
-@router.post("/{id}/translate", response_model=DocumentPagesResponse)
+@router.post(
+    "/{id}/translate",
+    response_model=DocumentPagesResponse,
+    dependencies=[Depends(limit_user("paid", "RATE_LIMIT_PAID_CALLS")), Depends(ensure_within_budget)],
+)
 def translate_document(
     id: str,
     current_user: Dict[str, Any] = Depends(RoleRequirement(["Reviewer", "Admin"])),
@@ -298,7 +309,7 @@ def translate_document(
     ])
     return DocumentPagesResponse(document_id=id, pages=translated)
 
-@router.post("/{id}/process")
+@router.post("/{id}/process", dependencies=[Depends(limit_user("paid", "RATE_LIMIT_PAID_CALLS")), Depends(ensure_within_budget)])
 def process_document(
     id: str,
     background_tasks: BackgroundTasks,

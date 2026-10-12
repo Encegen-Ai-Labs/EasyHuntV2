@@ -4,7 +4,9 @@ from fastapi import APIRouter, Depends
 from fastapi.responses import Response
 from supabase import Client
 
+from app.core.rate_limiting import limit_user
 from app.dependencies.auth import RoleRequirement
+from app.services.llm_usage import ensure_within_budget
 from app.dependencies.db import get_supabase_service_client
 from app.repositories.base import BaseRepository
 from app.repositories.case_repo import CaseRepository
@@ -39,7 +41,11 @@ def list_report_formats(
     return report_formats.list_formats()
 
 
-@router.post("/{case_id}/report/draft", response_model=ReportDraft)
+@router.post(
+    "/{case_id}/report/draft",
+    response_model=ReportDraft,
+    dependencies=[Depends(limit_user("paid", "RATE_LIMIT_PAID_CALLS")), Depends(ensure_within_budget)],
+)
 def create_report_draft(
     case_id: str,
     payload: DraftRequest,
@@ -51,7 +57,7 @@ def create_report_draft(
     return service.build_draft(case_id, payload.format_id, current_user)
 
 
-@router.post("/{case_id}/report/export")
+@router.post("/{case_id}/report/export", dependencies=[Depends(limit_user("paid", "RATE_LIMIT_PAID_CALLS"))])
 def export_report(
     case_id: str,
     payload: ExportRequest,

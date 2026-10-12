@@ -25,5 +25,5 @@ def create_access_token(data: Dict[str, Any], expires_delta: Optional[timedelta]
         "sub": str(data.get("sub")),
         "role": data.get("role")
     })
-    encoded_jwt = jwt.encode(to_encode, settings.SUPABASE_JWT_SECRET, algorithm=settings.ALGORITHM)
+    encoded_jwt = jwt.encode(to_encode, settings.jwt_signing_secret, algorithm=settings.ALGORITHM)
     return encoded_jwt

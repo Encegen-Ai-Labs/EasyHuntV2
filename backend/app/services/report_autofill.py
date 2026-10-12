@@ -17,6 +17,7 @@ from google.genai import types
 
 from app.core.logging import logger
 from app.services.llm_extractor import GEMINI_MODEL, _clean_json_response, client_genai
+from app.services.llm_usage import generate_tracked
 
 AUTOFILL_TIMEOUT_MS = 120_000
 MAX_DOCUMENT_CHARS = 60_000  # across all documents; keeps one call affordable
@@ -86,7 +87,7 @@ def build_prompt(fields: List[Dict[str, Any]], loops: List[Dict[str, Any]], docu
 
 
 def _gemini_generate(prompt: str) -> str:
-    response = client_genai.models.generate_content(
+    response = generate_tracked("report_autofill", 
         model=GEMINI_MODEL,
         contents=[prompt],
         config=types.GenerateContentConfig(

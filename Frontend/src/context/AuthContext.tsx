@@ -138,6 +138,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localStorage.removeItem(USER_KEY);
     localStorage.removeItem("propverify_role");
     localStorage.removeItem("propverify_user_id");
+    // Saved report drafts hold client names; they must not outlive the session on a shared computer.
+    for (const key of Object.keys(localStorage)) {
+      if (key.startsWith("easyhunt:report-draft:")) localStorage.removeItem(key);
+    }
     router.push("/");
   }
 

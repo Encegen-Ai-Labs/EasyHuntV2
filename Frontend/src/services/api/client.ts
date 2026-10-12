@@ -116,6 +116,23 @@ export interface SearchTerm {
   locations: { document_id: string; page_number: number }[];
 }
 
+export interface UsageSummary {
+  days: number;
+  estimated: boolean;
+  today_cost_usd: number;
+  daily_budget_usd: number;
+  total_cost_usd: number;
+  total_calls: number;
+  tokens_in: number;
+  tokens_out: number;
+  errors: number;
+  rate_limited: number;
+  by_day: { date: string; cost_usd: number; calls: number }[];
+  by_kind: { kind: string; calls: number; tokens_in: number; tokens_out: number; errors: number; cost_usd: number }[];
+  top_cases: { case_id: string; name: string | null; cost_usd: number }[];
+  recent_failures: { created_at: string; kind: string; status: string; error: string | null }[];
+}
+
 export interface ReportFormat {
   id: string;
   kind: "title_search" | "bank";
@@ -756,6 +773,18 @@ export const apiClient = {
         throw new Error(errData.detail || `Failed to load users (${res.status})`);
       }
       return res.json();
+    },
+
+    getUsage: async (days: number): Promise<{ success: boolean; data?: UsageSummary; error?: string }> => {
+      try {
+        const res = await fetch(`${API_BASE_URL}/admin/usage?days=${days}`, {
+          headers: getAuthHeaders({ "Content-Type": "application/json" }),
+        });
+        if (!res.ok) throw new Error(await errorMessage(res, "Could not load usage"));
+        return { success: true, data: await res.json() };
+      } catch (err: any) {
+        return { success: false, error: err.message };
+      }
     },
 
     createReviewer: async (payload: { email: string; password: string; organisation_name: string }) => {

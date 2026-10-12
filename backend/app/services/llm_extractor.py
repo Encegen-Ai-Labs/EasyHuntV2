@@ -1,4 +1,4 @@
-﻿from google import genai
+from google import genai
 from google.genai import types
 import json
 import os
@@ -6,6 +6,8 @@ import tempfile
 from app.services.rate_limit import is_rate_limit_error
 from typing import Dict, Any
 from dotenv import load_dotenv
+from app.services.llm_usage import generate_tracked
+from app.core.redaction import safe_error
 
 load_dotenv()
 
@@ -164,7 +166,7 @@ def extract_structured_fields_from_text(text: str) -> Dict[str, Any]:
     has the routed transcription and the router's own handwriting signal."""
     raw_output = None
     try:
-        response = client_genai.models.generate_content(
+        response = generate_tracked("field_extraction_text", 
             model=GEMINI_MODEL,
             contents=[STRUCTURED_EXTRACTION_FROM_TEXT_PROMPT, text],
             config=types.GenerateContentConfig(
@@ -199,7 +201,7 @@ def extract_structured_fields_from_text(text: str) -> Dict[str, Any]:
             "raw_output": None,
             "extracted": None,
             "model_used": GEMINI_MODEL,
-            "error": str(e),
+            "error": safe_error(e),
             "rate_limited": is_rate_limit_error(e),
         }
 
@@ -247,7 +249,7 @@ def extract_from_image_path(image_path: str, mime_type: str | None = None) -> Di
         # alone is only a reasonable guess when nothing better is known.
         mime_type = mime_type or _get_mime_type(image_path)
 
-        response = client_genai.models.generate_content(
+        response = generate_tracked("field_extraction_image", 
             model=GEMINI_MODEL,
             contents=[
                 types.Part.from_bytes(
@@ -291,7 +293,7 @@ def extract_from_image_path(image_path: str, mime_type: str | None = None) -> Di
             "raw_output": None,
             "extracted": None,
             "model_used": GEMINI_MODEL,
-            "error": str(e),
+            "error": safe_error(e),
             "rate_limited": is_rate_limit_error(e),
         }
 
@@ -328,5 +330,5 @@ def extract_from_supabase_url(file_url: str, mime_type: str | None = None) -> Di
             "raw_output": None,
             "extracted": None,
             "model_used": GEMINI_MODEL,
-            "error": str(e)
+            "error": safe_error(e)
         }

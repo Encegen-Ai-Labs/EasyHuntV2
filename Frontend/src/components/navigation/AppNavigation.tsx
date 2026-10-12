@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, Home, ListChecks, LogOut, ShieldCheck, UserRound } from "lucide-react";
+import { BarChart3, Coins, Home, ListChecks, LogOut, ShieldCheck, UserRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { cn } from "@/lib/utils";
@@ -22,12 +22,15 @@ const navItems = [
 ];
 
 // Shown only to an Admin: create lawyer accounts and assign cases.
-const adminNavItem = { href: "/admin/users", label: "Admin", icon: ShieldCheck };
+const adminNavItems = [
+  { href: "/admin/users", label: "Admin", icon: ShieldCheck },
+  { href: "/admin/usage", label: "Usage", icon: Coins },
+];
 
 export function AppNavigation() {
   const pathname = usePathname();
   const { user, isAuthenticated, isLoading, logout } = useAuth();
-  const items = user?.role === "Admin" ? [...navItems, adminNavItem] : navItems;
+  const items = user?.role === "Admin" ? [...navItems, ...adminNavItems] : navItems;
 
   return (
     <header className="sticky top-0 z-50 border-b bg-background">

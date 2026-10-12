@@ -21,10 +21,7 @@ def _make_low_contrast_page_png(skew_degrees: float = 0.0) -> bytes:
     (low contrast), optionally rotated to simulate a skewed scan."""
     img = Image.new("L", (800, 1000), color=235)
     draw = ImageDraw.Draw(img)
-    try:
-        font = ImageFont.truetype("arial.ttf", 28)
-    except OSError:
-        font = ImageFont.load_default()
+    font = ImageFont.load_default(size=28)  # bundled with Pillow: identical on every OS
 
     for i in range(15):
         draw.text((60, 60 + i * 50), f"Sale deed line {i} — property record text", fill=170, font=font)
@@ -88,10 +85,7 @@ def _make_high_contrast_sharp_page_png() -> bytes:
     should read this as already good quality and leave it largely alone."""
     img = Image.new("L", (800, 1000), color=255)
     draw = ImageDraw.Draw(img)
-    try:
-        font = ImageFont.truetype("arial.ttf", 28)
-    except OSError:
-        font = ImageFont.load_default()
+    font = ImageFont.load_default(size=28)  # bundled with Pillow: identical on every OS
 
     for i in range(15):
         draw.text((60, 60 + i * 50), f"Sale deed line {i} — property record text", fill=0, font=font)
@@ -166,10 +160,7 @@ def _make_noisy_page_png() -> bytes:
 
     img = Image.new("L", (800, 1000), color=255)
     draw = ImageDraw.Draw(img)
-    try:
-        font = ImageFont.truetype("arial.ttf", 28)
-    except OSError:
-        font = ImageFont.load_default()
+    font = ImageFont.load_default(size=28)  # bundled with Pillow: identical on every OS
     for i in range(15):
         draw.text((60, 60 + i * 50), f"Sale deed line {i} — property record text", fill=0, font=font)
 

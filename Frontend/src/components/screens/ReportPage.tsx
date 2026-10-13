@@ -21,6 +21,7 @@ import { useToast } from "@/context/ToastContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { CaseStepper } from "@/components/case/CaseStepper";
+import { StepGuide } from "@/components/case/StepGuide";
 import { PageHeader } from "@/components/case/PageHeader";
 import { BankFormEditor, TitleSearchEditor } from "@/components/report/DraftEditors";
 
@@ -199,6 +200,17 @@ export function ReportPage() {
       <div className="mx-auto max-w-5xl">
         {header}
         <CaseStepper caseId={caseId} current="report" />
+
+        <StepGuide
+          id="report"
+          title="Step 4 of 4: make the report"
+          steps={[
+            "Choose the kind of report: a Title Search Report, or one of the bank formats.",
+            "The report is filled in from your approved documents and the text you selected. Read every part and edit what needs changing.",
+            "Download it as Word or PDF when you are happy with it.",
+          ]}
+          note="Opinions and remarks are never written for you. Those parts are left for you to complete."
+        />
 
         <Card>
           <CardHeader className="border-b">

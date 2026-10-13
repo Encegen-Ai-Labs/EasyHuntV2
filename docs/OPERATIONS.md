@@ -54,9 +54,29 @@ Every call to Gemini or Google Translation is recorded in the `llm_usage` table:
 | Login | 10 / minute | client address (stops password guessing) |
 | Upload | 20 / minute | user |
 | Translate, process, report draft and export | 20 / minute | user (these spend money or CPU) |
-| Everything else | 300 / minute | client address (not `/health`) |
+| Everything else | 1200 / minute | client address (not `/health`); high because a whole office usually shares one address |
 
 Change them with `RATE_LIMIT_*` in `.env`. A blocked request gets HTTP 429 with a `Retry-After` header and a plain message. Limits are shared across API processes through Redis. If Redis is unreachable, requests are **allowed** and the problem is logged (a broken limiter must not lock lawyers out). Set `TRUST_PROXY=true` only behind a reverse proxy you control, so the real client address is used.
+
+## 4b. Several lawyers at once (target: 5-6 users, 20 documents each)
+
+What keeps that safe, and the knobs:
+
+- **Slow work stays off the request path.** Upload and login run in the threadpool, so one lawyer's 20-file upload cannot freeze the app for the others (`tests/test_concurrent_users.py` fails if that regresses).
+- **One cap on document reading.** With Celery on (production), `CELERY_WORKER_CONCURRENCY` (default 3, hard cap 6) documents are read at once, however many lawyers upload; the rest wait in the queue. Without Celery, `MAX_CONCURRENT_EXTRACTIONS` (3) applies to the whole process, not per upload. Rate-limited documents are retried with backoff in both modes.
+- **Throughput, not correctness, is the limit.** 120 documents at 3 at a time means a long queue; each lawyer sees their documents move from "Reading" to "Ready to review" as they finish. Raise concurrency only after checking Gemini's per-minute quota (see section 3 of PRODUCTION_PLAN).
+- **PDFs over 150 pages are refused** with a message, so one huge file cannot exhaust memory for everyone (`MAX_PAGES_PER_DOCUMENT`).
+- The review page loads a 20-document case with one query and parallel signed links instead of ~40 sequential calls.
+- Docker runs 2 API processes (`--workers 2`); limits and the queue are shared through Redis.
+
+**Run the load test before relying on this** (it uses real Gemini and writes real rows, so use staging and start small):
+
+```
+python scripts/load_test.py --base-url https://staging.example --admin-email ... --admin-password ... --users 2 --docs 3 --cleanup
+python scripts/load_test.py ... --users 6 --docs 20 --cleanup
+```
+
+It prints requests, failures and p50/p95 times per request type, and how long batches took to finish. Then check the Usage and Errors admin screens. The load-test script itself was only exercised against a stub server, not a real deployment.
 
 ## 5. Health
 

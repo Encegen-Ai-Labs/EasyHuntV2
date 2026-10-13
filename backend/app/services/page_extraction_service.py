@@ -302,6 +302,13 @@ def _dpi_for_page(page: "fitz.Page") -> int:
     return int(min(RASTER_DPI, capped_dpi))
 
 
+# A 10 MB PDF can hold hundreds of pages, and every page is held in memory as an
+# image while the document is read. With several documents being read at once, one
+# such file could take the server down for everybody, so it is refused up front
+# with a message the lawyer can act on. Real deeds and records are far shorter.
+MAX_PAGES_PER_DOCUMENT = 150
+
+
 def rasterize_pages(file_bytes: bytes, mime_type: str) -> List[bytes]:
     """Splits a document into one PNG image per page.
 
@@ -321,6 +328,11 @@ def rasterize_pages(file_bytes: bytes, mime_type: str) -> List[bytes]:
 
     pdf = fitz.open(stream=file_bytes, filetype="pdf")
     try:
+        if pdf.page_count > MAX_PAGES_PER_DOCUMENT:
+            raise ValueError(
+                f"This PDF has {pdf.page_count} pages; the limit is {MAX_PAGES_PER_DOCUMENT}. "
+                "Split it into smaller files and upload those."
+            )
         pages: List[bytes] = []
         for index in range(pdf.page_count):
             page = pdf[index]

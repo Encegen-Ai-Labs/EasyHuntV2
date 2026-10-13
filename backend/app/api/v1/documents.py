@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, UploadFile, File, Form, status, BackgroundTasks
+from starlette.concurrency import run_in_threadpool
 from app.schemas.documents import BatchUploadResponse, DocumentResponse, DocumentUploadResult
 from app.schemas.document_pages import DocumentPageResponse, DocumentPagesResponse, EnhancedPageImageResponse, UpdatePageTextRequest
 from app.services.doc_service import DocumentService, STORAGE_BUCKET, enhanced_page_image_path
@@ -68,7 +69,11 @@ async def upload_documents(
     # Case-level authorization applies to the whole batch, not per file — a missing
     # or forbidden case fails the entire request instead of repeating the same
     # error once per file.
-    service.authorize_case_access(case_id, current_user)
+    # The storage and database calls below are blocking. This handler is async
+    # (it awaits the file reads), so they run in the threadpool: calling them
+    # directly would freeze the whole server, for every other user, for as long
+    # as a 20-file batch takes to store.
+    await run_in_threadpool(service.authorize_case_access, case_id, current_user)
 
     results: List[DocumentUploadResult] = []
     uploaded_doc_ids: List[str] = []
@@ -76,12 +81,13 @@ async def upload_documents(
     for file in files:
         try:
             file_bytes = await file.read()
-            document = service.upload_file(
+            document = await run_in_threadpool(
+                service.upload_file,
                 case_id=case_id,
                 file_name=file.filename,
                 file_bytes=file_bytes,
                 mime_type=file.content_type,
-                current_user=current_user
+                current_user=current_user,
             )
             results.append(DocumentUploadResult(file_name=file.filename, success=True, document=document))
             if document.get("id"):
@@ -91,10 +97,13 @@ async def upload_documents(
             # keep processing the rest of the batch instead of failing the request.
             results.append(DocumentUploadResult(file_name=file.filename, success=False, error=e.message))
 
+    # Queueing talks to Redis (blocking), so it also stays off the event loop.
     if force_refresh:
-        outcome = dispatch_documents(uploaded_doc_ids, pipeline_service, background_tasks, force_refresh=True)
+        outcome = await run_in_threadpool(
+            dispatch_documents, uploaded_doc_ids, pipeline_service, background_tasks, force_refresh=True
+        )
     else:
-        outcome = dispatch_documents(uploaded_doc_ids, pipeline_service, background_tasks)
+        outcome = await run_in_threadpool(dispatch_documents, uploaded_doc_ids, pipeline_service, background_tasks)
     for result in results:
         if result.document and str(result.document.id) in outcome.failed_ids:
             result.error = (

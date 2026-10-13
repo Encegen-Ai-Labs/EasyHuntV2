@@ -8,10 +8,11 @@ import { apiClient, type DocumentPageRecord, type SearchTerm } from "@/services/
 import { useCaseById, useCaseProgress } from "@/services/api/hooks";
 import { useToast } from "@/context/ToastContext";
 import { Button } from "@/components/ui/button";
+import { KeyboardInput } from "@/components/keyboard/KeyboardField";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { CaseStepper } from "@/components/case/CaseStepper";
+import { StepGuide } from "@/components/case/StepGuide";
 import { PageHeader } from "@/components/case/PageHeader";
 import { SelectableText } from "@/components/search/SelectableText";
 import { cn } from "@/lib/utils";
@@ -243,6 +244,17 @@ export function CaseSearchPage() {
 
         <CaseStepper caseId={caseId} current="search" />
 
+        <StepGuide
+          id="search"
+          title="Step 3 of 4: find the text you want in the report"
+          steps={[
+            "Type a name, number or word in any box you need (the अ button types in Marathi), then press Find in documents.",
+            "Tick the spellings you mean. Matches are highlighted in the document.",
+            "Select the exact text you want to quote and add it to your report.",
+          ]}
+          note="Only approved documents are searched."
+        />
+
         <Card>
           <CardHeader className="border-b">
             <CardTitle className="flex items-center gap-2 text-lg">
@@ -255,7 +267,7 @@ export function CaseSearchPage() {
                 {FIELDS.filter((f) => showMore || f.primary).map((field) => (
                   <label key={field.key} className="flex flex-col gap-1.5">
                     <span className="text-sm font-medium">{field.label}</span>
-                    <Input
+                    <KeyboardInput
                       value={values[field.key]}
                       onChange={(e) => setValues((prev) => ({ ...prev, [field.key]: e.target.value }))}
                       placeholder={field.placeholder}

@@ -8,8 +8,8 @@ import { apiClient, type CaseRecord, type ReportExcerpt } from "@/services/api/c
 import { useToast } from "@/context/ToastContext";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { KeyboardInput, KeyboardTextarea } from "@/components/keyboard/KeyboardField";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
 import { CaseStepper } from "@/components/case/CaseStepper";
 import { PageHeader } from "@/components/case/PageHeader";
 import { FormattedText } from "@/components/text/FormattedText";
@@ -208,7 +208,7 @@ export function ReportBuilderPage() {
 
                   {editingExcerptId === excerpt.id ? (
                     <div className="flex flex-col gap-2">
-                      <textarea
+                      <KeyboardTextarea
                         value={draftText}
                         onChange={(e) => setDraftText(e.target.value)}
                         className="min-h-[80px] w-full rounded-lg border border-input bg-transparent px-2.5 py-1.5 text-sm leading-relaxed outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30"
@@ -229,7 +229,7 @@ export function ReportBuilderPage() {
                     </div>
                   )}
 
-                  <Input
+                  <KeyboardInput
                     placeholder="Add a note about this excerpt (optional)"
                     value={excerpt.note || ""}
                     onChange={(e) => handleNoteChange(excerpt.id, e.target.value)}

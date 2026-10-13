@@ -13,6 +13,7 @@ import { DocumentList } from "@/components/case/DocumentList";
 import { RiskFlagsPanel } from "@/components/case/RiskFlagsPanel";
 import { CaseStepper } from "@/components/case/CaseStepper";
 import { PageHeader } from "@/components/case/PageHeader";
+import { StepGuide } from "@/components/case/StepGuide";
 
 export function CaseWorkspacePage() {
   const params = useParams();
@@ -30,10 +31,21 @@ export function CaseWorkspacePage() {
       <div className="mx-auto max-w-5xl">
         <PageHeader
           title={caseDetails?.title || caseDetails?.property_name || "Case Workspace"}
-          subtitle={caseDetails?.address || caseDetails?.location || "Location not set"}
+          subtitle={caseDetails?.address && caseDetails.address !== "Address N/A" ? caseDetails.address : caseDetails?.location || "No location added"}
         />
 
         <CaseStepper caseId={caseId} current="upload" />
+
+        <StepGuide
+          id="upload"
+          title="Step 1 of 4: add the property documents"
+          steps={[
+            "Drag the files into the box below, or click it to choose them. PDFs and photos of pages both work.",
+            "Press Upload. Each document is read automatically, which takes a few minutes. You can leave this page and come back.",
+            "When a document says “Ready to review”, open it from the list and check what was read (the next step).",
+          ]}
+          note="You can add more documents at any time, up to 20 at once."
+        />
 
         <Card>
           <CardHeader className="border-b">

@@ -242,3 +242,19 @@ def test_strip_annotation_tags_collapses_blank_lines_left_by_removed_tags():
     assert "\n\n\n" not in result
     assert "Line one" in result
     assert "Line two" in result
+
+
+def test_pdf_with_too_many_pages_is_refused_with_a_clear_message(monkeypatch):
+    import fitz
+    import pytest
+    from app.services import page_extraction_service as pes
+
+    monkeypatch.setattr(pes, "MAX_PAGES_PER_DOCUMENT", 3)
+    pdf = fitz.open()
+    for _ in range(4):
+        pdf.new_page()
+    data = pdf.tobytes()
+    pdf.close()
+
+    with pytest.raises(ValueError, match="4 pages; the limit is 3"):
+        pes.rasterize_pages(data, "application/pdf")

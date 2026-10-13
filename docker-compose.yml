@@ -23,7 +23,9 @@ services:
       context: ./backend
     env_file:
       - ./backend/.env
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
+    # Two API processes: one busy with a slow request cannot stall the other, and the
+    # limits and the queue live in Redis, so they are shared between the two.
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2
     restart: unless-stopped
     ports:
       - "8000:8000"

@@ -105,7 +105,10 @@ class Settings(BaseSettings):
     RATE_LIMIT_UPLOAD: str = Field(default="20/minute", validation_alias="RATE_LIMIT_UPLOAD")
     # Calls that spend money (translation, report drafting) are limited per user.
     RATE_LIMIT_PAID_CALLS: str = Field(default="20/minute", validation_alias="RATE_LIMIT_PAID_CALLS")
-    RATE_LIMIT_DEFAULT: str = Field(default="300/minute", validation_alias="RATE_LIMIT_DEFAULT")
+    # Per client address, and a whole office usually shares ONE address. Six lawyers
+    # whose pages refresh every few seconds add up quickly, so this is generous; the
+    # limits that protect money are the per-user ones above.
+    RATE_LIMIT_DEFAULT: str = Field(default="1200/minute", validation_alias="RATE_LIMIT_DEFAULT")
 
     # ---- LLM usage and cost (app/services/llm_usage.py) ----
     # ESTIMATES in US dollars per million tokens (per million characters for

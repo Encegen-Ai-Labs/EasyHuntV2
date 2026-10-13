@@ -1,6 +1,8 @@
 import asyncio
 import contextvars
+import random
 import time
+import weakref
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Dict, Any, List, Optional
 from app.core import context
@@ -30,6 +32,32 @@ from app.core.redaction import safe_error
 # runs from a single request. FastAPI's BackgroundTasks would otherwise run these
 # unbounded, hammering the Gemini API at once — cap how many run concurrently.
 MAX_CONCURRENT_EXTRACTIONS = 3
+# The cap above is shared by EVERY batch in this process (see _extraction_slots),
+# not applied per batch: with one cap per batch, six lawyers uploading at the same
+# time would run 18 documents at once and trip Gemini's rate limits.
+
+# In-process mode only (the Celery worker has its own retry in tasks/document_tasks.py):
+# a document Gemini rate-limited is retried this many times, waiting
+# base * 2^attempt seconds (plus jitter) between tries, outside its slot so other
+# documents keep moving.
+IN_PROCESS_RATE_LIMIT_RETRIES = 4
+IN_PROCESS_RATE_LIMIT_BACKOFF_SECONDS = 20
+
+_slots_by_loop: "weakref.WeakKeyDictionary[asyncio.AbstractEventLoop, asyncio.Semaphore]" = (
+    weakref.WeakKeyDictionary()
+)
+
+
+def _extraction_slots() -> asyncio.Semaphore:
+    """The one semaphore that limits concurrent document extractions in this
+    process. Kept per event loop because an asyncio semaphore belongs to the loop
+    that first waits on it; a server has exactly one loop, so in practice this is
+    a single process-wide limit."""
+    loop = asyncio.get_running_loop()
+    slots = _slots_by_loop.get(loop)
+    if slots is None:
+        slots = _slots_by_loop[loop] = asyncio.Semaphore(MAX_CONCURRENT_EXTRACTIONS)
+    return slots
 
 # Within one document, pages are enhanced/routed concurrently too (see
 # _process_page/ThreadPoolExecutor below) rather than one at a time — a
@@ -617,34 +645,64 @@ class PipelineService:
             "pipeline.batch_started | document_ids=%s concurrency=%s",
             doc_ids, MAX_CONCURRENT_EXTRACTIONS,
         )
-        semaphore = asyncio.Semaphore(MAX_CONCURRENT_EXTRACTIONS)
+        slots = _extraction_slots()
+
+        async def _run_once(doc_id: str, force: bool) -> Any:
+            async with slots:
+                if force:
+                    return await asyncio.to_thread(self.execute_analysis_pipeline, doc_id, True)
+                return await asyncio.to_thread(self.execute_analysis_pipeline, doc_id)
 
         async def _run_one(doc_id: str) -> None:
-            async with semaphore:
-                try:
-                    if force_refresh:
-                        await asyncio.to_thread(self.execute_analysis_pipeline, doc_id, True)
-                    else:
-                        await asyncio.to_thread(self.execute_analysis_pipeline, doc_id)
-                except Exception:
-                    # execute_analysis_pipeline already catches its own known
-                    # failure points (rasterization, structured extraction)
-                    # and returns {"status": "failed", ...} for them without
-                    # raising. Reaching here means something unexpected blew
-                    # up instead (e.g. a DB/storage call raising outright).
-                    # Previously that was swallowed silently by
-                    # asyncio.gather(..., return_exceptions=True) below —
-                    # exactly why a document could vanish mid-batch with no
-                    # error anywhere, indistinguishable from "still
-                    # processing". Log the full traceback and make sure the
-                    # document doesn't stay stuck in "processing" forever.
-                    logger.exception("pipeline.document_crashed | document_id=%s", doc_id)
+            try:
+                for attempt in range(IN_PROCESS_RATE_LIMIT_RETRIES + 1):
+                    result = await _run_once(doc_id, force_refresh)
+                    rate_limited = (
+                        isinstance(result, dict)
+                        and result.get("status") == "failed"
+                        and result.get("rate_limited")
+                    )
+                    if not rate_limited or attempt == IN_PROCESS_RATE_LIMIT_RETRIES:
+                        if rate_limited:
+                            logger.error(
+                                "pipeline.rate_limited_giving_up | document_id=%s attempts=%s",
+                                doc_id, attempt + 1,
+                            )
+                        return
+                    delay = IN_PROCESS_RATE_LIMIT_BACKOFF_SECONDS * (2 ** attempt)
+                    delay += random.uniform(0, delay * 0.25)
+                    logger.warning(
+                        "pipeline.rate_limited_retrying | document_id=%s retry=%s wait=%.0fs",
+                        doc_id, attempt + 1, delay,
+                    )
+                    # The pipeline flagged the document when it failed; show it as
+                    # in progress again while it waits for its retry.
                     try:
-                        self.doc_repo.update_status(doc_id, "flagged")
+                        await asyncio.to_thread(self.doc_repo.update_status, doc_id, "processing")
                     except Exception:
                         logger.exception(
-                            "pipeline.document_crash_status_update_failed | document_id=%s", doc_id,
+                            "pipeline.rate_limit_status_reset_failed | document_id=%s", doc_id,
                         )
+                    await asyncio.sleep(delay)
+            except Exception:
+                # execute_analysis_pipeline already catches its own known
+                # failure points (rasterization, structured extraction)
+                # and returns {"status": "failed", ...} for them without
+                # raising. Reaching here means something unexpected blew
+                # up instead (e.g. a DB/storage call raising outright).
+                # Previously that was swallowed silently by
+                # asyncio.gather(..., return_exceptions=True) below —
+                # exactly why a document could vanish mid-batch with no
+                # error anywhere, indistinguishable from "still
+                # processing". Log the full traceback and make sure the
+                # document doesn't stay stuck in "processing" forever.
+                logger.exception("pipeline.document_crashed | document_id=%s", doc_id)
+                try:
+                    self.doc_repo.update_status(doc_id, "flagged")
+                except Exception:
+                    logger.exception(
+                        "pipeline.document_crash_status_update_failed | document_id=%s", doc_id,
+                    )
 
         await asyncio.gather(*(_run_one(doc_id) for doc_id in doc_ids), return_exceptions=True)
         logger.info("pipeline.batch_completed | document_ids=%s", doc_ids)

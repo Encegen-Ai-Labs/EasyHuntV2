@@ -7,15 +7,15 @@ import {
   Activity,
   CheckCircle2,
   FileSearch,
-  MoreHorizontal,
+  ArrowRight,
   Search,
   Download,
 } from "lucide-react";
 import { useDashboardCases } from "@/services/api/hooks";
 import { Button } from "@/components/ui/button";
+import { KeyboardInput } from "@/components/keyboard/KeyboardField";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import {
   Table,
   TableBody,
@@ -24,15 +24,18 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { CaseRecord } from "@/services/api/client";
 
-function riskVariant(risk: string): "default" | "secondary" | "destructive" | "outline" {
-  if (risk === "Critical") return "destructive";
-  if (risk === "High") return "outline";
-  return "secondary";
-}
+/** What a case's status means, in words a first-time user understands. */
+const STATUS_LABEL: Record<string, string> = {
+  Draft: "Not started",
+  Processing: "Reading documents",
+  "Needs Review": "Ready to review",
+  Flagged: "Needs attention",
+  Completed: "Finished",
+};
+const statusLabel = (status: string) => STATUS_LABEL[status] ?? status;
 
 function isWithinDays(dateStr: string, days: number): boolean {
   const date = new Date(dateStr);
@@ -49,14 +52,12 @@ function isThisCalendarMonth(dateStr: string): boolean {
 }
 
 function toCsv(cases: CaseRecord[]): string {
-  const header = ["Case ID", "Title", "Status", "Priority", "Risk", "Owner", "Created"];
+  const header = ["Case ID", "Title", "Place", "Status", "Created"];
   const rows = cases.map((c) => [
     c.id,
     c.title,
-    c.status,
-    c.priority,
-    c.risk,
-    c.assignee.name,
+    c.address === "Address N/A" ? "" : c.address,
+    statusLabel(c.status),
     c.createdAt,
   ]);
   return [header, ...rows]
@@ -117,12 +118,10 @@ export function DashboardPage() {
         {/* Page header */}
         <section className="mb-8 flex flex-wrap items-end justify-between gap-4">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-              Operating Dashboard
+            <h1 className="text-3xl font-bold tracking-tight md:text-4xl">Overview</h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Where all your cases stand. Open a case to continue working on it.
             </p>
-            <h1 className="mt-1 text-3xl font-bold tracking-tight md:text-4xl">
-              Property Intelligence
-            </h1>
           </div>
           <div className="flex gap-2">
             <Button variant="outline" size="sm" onClick={handleExport} disabled={dashboardCases.length === 0}>
@@ -130,16 +129,16 @@ export function DashboardPage() {
               Export
             </Button>
             <Button size="sm" nativeButton={false} render={<Link href="/cases/new" />}>
-              Create Case
+              New case
             </Button>
           </div>
         </section>
 
         {/* KPI cards */}
         <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          <KpiCard title="Total Cases" value={String(kpis.total)} icon={<FileSearch size={18} />} />
-          <KpiCard title="Pending Extractions" value={String(kpis.pendingExtractions)} icon={<Activity size={18} />} />
-          <KpiCard title="Completed Reviews" value={String(kpis.completedReviews)} icon={<CheckCircle2 size={18} />} />
+          <KpiCard title="All cases" value={String(kpis.total)} icon={<FileSearch size={18} />} />
+          <KpiCard title="Being read" value={String(kpis.pendingExtractions)} icon={<Activity size={18} />} />
+          <KpiCard title="Finished cases" value={String(kpis.completedReviews)} icon={<CheckCircle2 size={18} />} />
         </section>
 
         {/* Cases table */}
@@ -148,10 +147,11 @@ export function DashboardPage() {
             <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
               <div className="flex flex-wrap items-center gap-2">
                 <div className="relative">
-                  <Search className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
-                  <Input
-                    className="h-9 w-[240px] pl-8 text-sm"
-                    placeholder="Search cases…"
+                  <KeyboardInput
+                    leadingIcon={<Search className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />}
+                    wrapperClassName="w-[240px]"
+                    className="h-9 pl-8 text-sm"
+                    placeholder="Search by property name or place…"
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
                   />
@@ -161,12 +161,12 @@ export function DashboardPage() {
                   value={statusFilter}
                   onChange={(e) => setStatusFilter(e.target.value)}
                 >
-                  <option>All status</option>
-                  <option>Draft</option>
-                  <option>Processing</option>
-                  <option>Needs Review</option>
-                  <option>Flagged</option>
-                  <option>Completed</option>
+                  <option value="All status">All statuses</option>
+                  <option value="Draft">{statusLabel("Draft")}</option>
+                  <option value="Processing">{statusLabel("Processing")}</option>
+                  <option value="Needs Review">{statusLabel("Needs Review")}</option>
+                  <option value="Flagged">{statusLabel("Flagged")}</option>
+                  <option value="Completed">{statusLabel("Completed")}</option>
                 </select>
                 <select
                   className="h-9 min-w-[150px] rounded-lg border border-input bg-background px-3 text-sm text-foreground outline-none transition-colors focus:border-ring"
@@ -189,20 +189,22 @@ export function DashboardPage() {
             {isError && (
               <p className="p-6 text-sm font-medium text-destructive">Unable to load cases.</p>
             )}
-            {!isLoading && !isError && filteredCases.length === 0 && (
-              <p className="p-6 text-sm text-muted-foreground">No cases match your filters.</p>
+            {!isLoading && !isError && dashboardCases.length === 0 && (
+              <p className="p-6 text-sm text-muted-foreground">
+                No cases yet. Press <span className="font-medium text-foreground">New case</span> to start one.
+              </p>
+            )}
+            {!isLoading && !isError && dashboardCases.length > 0 && filteredCases.length === 0 && (
+              <p className="p-6 text-sm text-muted-foreground">No cases match what you typed or chose. Clear the search or the filters to see all cases.</p>
             )}
             {!isLoading && !isError && filteredCases.length > 0 && (
               <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead>Case</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Priority</TableHead>
-                    <TableHead>Risk</TableHead>
-                    <TableHead>Owner</TableHead>
+                    <TableHead>Where it is</TableHead>
                     <TableHead>Created</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
+                    <TableHead className="text-right"><span className="sr-only">Open</span></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -214,24 +216,10 @@ export function DashboardPage() {
                     >
                       <TableCell>
                         <div className="font-medium">{caseItem.title}</div>
-                        <div className="text-xs text-muted-foreground">{caseItem.address}</div>
+                        <div className="text-xs text-muted-foreground">{caseItem.address === "Address N/A" ? "No location added" : caseItem.address}</div>
                       </TableCell>
                       <TableCell>
-                        <Badge variant="secondary">{caseItem.status}</Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline">{caseItem.priority}</Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={riskVariant(caseItem.risk)}>{caseItem.risk}</Badge>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <Avatar size="sm">
-                            <AvatarFallback>{caseItem.assignee.avatar}</AvatarFallback>
-                          </Avatar>
-                          <span className="text-sm">{caseItem.assignee.name}</span>
-                        </div>
+                        <Badge variant="secondary">{statusLabel(caseItem.status)}</Badge>
                       </TableCell>
                       <TableCell className="text-muted-foreground">{caseItem.createdAt}</TableCell>
                       <TableCell className="text-right">
@@ -243,7 +231,8 @@ export function DashboardPage() {
                             openCase(caseItem.id);
                           }}
                         >
-                          <MoreHorizontal size={14} />
+                          Open
+                          <ArrowRight size={14} data-icon="inline-end" />
                         </Button>
                       </TableCell>
                     </TableRow>

@@ -1,3 +1,4 @@
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from typing import Dict, Any, List
 from app.repositories.case_repo import CaseRepository
@@ -42,18 +43,41 @@ class ReviewService:
         if not self.case_repo.get_by_id(case_id):
             raise ResourceNotFoundError("Target case not found")
 
+        documents = self.doc_repo.list_reviewable_by_case(case_id)
+        if not documents:
+            return []
+
+        # One query for every extraction, and the signed links fetched side by
+        # side: a 20-document case used to cost ~40 database/storage round trips
+        # made one after another on every page load, which adds up fast when
+        # several lawyers have a case open at once.
+        extractions_by_document: Dict[str, Dict[str, Any]] = {}
+        rows = (
+            self.extraction_repo.client.table("extractions")
+            .select("*")
+            .in_("document_id", [d["id"] for d in documents])
+            .order("id")
+            .execute()
+            .data
+        )
+        for row in rows or []:
+            extractions_by_document.setdefault(row["document_id"], row)
+
+        bucket = self.doc_repo.client.storage.from_("documents")
+
+        def signed_url(document: Dict[str, Any]) -> str:
+            return bucket.create_signed_url(document["file_path"], 3600)["signedURL"]
+
+        with ThreadPoolExecutor(max_workers=min(8, len(documents))) as pool:
+            file_urls = list(pool.map(signed_url, documents))
+
         review_documents = []
-        for document in self.doc_repo.list_reviewable_by_case(case_id):
-            extraction = self.extraction_repo.select_one(
-                "extractions", {"document_id": document["id"]}, order_by="id"
-            )
+        for document, file_url in zip(documents, file_urls):
+            extraction = extractions_by_document.get(document["id"])
             if extraction:
                 extraction["handwriting_flagged"] = bool(
                     extraction.get("has_handwritten_content")
                 )
-            file_url = self.doc_repo.client.storage.from_("documents").create_signed_url(
-                document["file_path"], 3600
-            )["signedURL"]
             review_documents.append({
                 "document": document,
                 "file_url": file_url,

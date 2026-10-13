@@ -4,8 +4,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Building2, Loader2, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { KeyboardInput } from "@/components/keyboard/KeyboardField";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { useCreateCaseMutation } from "@/services/api/hooks";
 import { useToast } from "@/context/ToastContext";
 
@@ -57,7 +57,7 @@ export function CaseCreationPage() {
                 <label htmlFor="property-name" className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
                   Property name
                 </label>
-                <Input
+                <KeyboardInput
                   id="property-name"
                   placeholder="1800 Meridian Avenue"
                   value={propertyName}
@@ -70,7 +70,7 @@ export function CaseCreationPage() {
                 <label htmlFor="location" className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
                   Location (optional)
                 </label>
-                <Input
+                <KeyboardInput
                   id="location"
                   placeholder="Pune, Maharashtra"
                   value={location}

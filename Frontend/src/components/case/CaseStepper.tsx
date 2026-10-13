@@ -6,11 +6,11 @@ import { cn } from "@/lib/utils";
 
 export type CaseStep = "upload" | "review" | "search" | "report";
 
-const STEPS: { id: CaseStep; label: string; path: (caseId: string) => string }[] = [
-  { id: "upload", label: "Upload", path: (id) => `/cases/${id}` },
-  { id: "review", label: "Review", path: (id) => `/cases/${id}/review` },
-  { id: "search", label: "Search", path: (id) => `/cases/${id}/search` },
-  { id: "report", label: "Report", path: (id) => `/cases/${id}/report` },
+const STEPS: { id: CaseStep; label: string; hint: string; path: (caseId: string) => string }[] = [
+  { id: "upload", label: "Upload", hint: "Add the papers", path: (id) => `/cases/${id}` },
+  { id: "review", label: "Review", hint: "Check and approve", path: (id) => `/cases/${id}/review` },
+  { id: "search", label: "Search", hint: "Find and select text", path: (id) => `/cases/${id}/search` },
+  { id: "report", label: "Report", hint: "Make and download", path: (id) => `/cases/${id}/report` },
 ];
 
 /** Where the lawyer is in a case. Search and Report stay locked until at least
@@ -32,7 +32,7 @@ export function CaseStepper({ caseId, current }: { caseId: string; current: Case
           const locked = lockReason(step.id);
           const isCurrent = step.id === current;
           const className = cn(
-            "-mb-px flex items-baseline gap-2 whitespace-nowrap border-b-2 pb-3 text-sm transition-colors",
+            "-mb-px flex items-start gap-2 whitespace-nowrap border-b-2 pb-2.5 text-sm transition-colors",
             isCurrent ? "border-primary font-semibold text-foreground" : "border-transparent",
             !isCurrent && !locked && "text-muted-foreground hover:text-foreground",
             locked && "cursor-not-allowed text-muted-foreground/60"
@@ -40,7 +40,10 @@ export function CaseStepper({ caseId, current }: { caseId: string; current: Case
           const body = (
             <>
               <span className={cn("text-xs tabular-nums", isCurrent ? "text-primary" : "text-muted-foreground/70")}>{index + 1}</span>
-              {step.label}
+              <span className="flex flex-col leading-tight">
+                <span>{step.label}</span>
+                <span className="text-[11px] font-normal text-muted-foreground/80">{locked ?? step.hint}</span>
+              </span>
               {step.id === "review" && total > 0 && !locked && (
                 <span className="text-xs font-normal text-muted-foreground">{approved}/{total}</span>
               )}

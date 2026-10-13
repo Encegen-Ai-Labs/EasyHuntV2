@@ -3,12 +3,12 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { MoreHorizontal, Plus, Search } from "lucide-react";
+import { ArrowRight, FolderOpen, Plus, Search } from "lucide-react";
 import { useDashboardCases } from "@/services/api/hooks";
 import { Button } from "@/components/ui/button";
+import { KeyboardInput } from "@/components/keyboard/KeyboardField";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import {
   Table,
   TableBody,
@@ -17,14 +17,18 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 
-function riskVariant(risk: string): "default" | "secondary" | "destructive" | "outline" {
-  if (risk === "Critical") return "destructive";
-  if (risk === "High") return "outline";
-  return "secondary";
-}
+
+/** What a case's status means, in words a first-time user understands. */
+const STATUS_LABEL: Record<string, string> = {
+  Draft: "Not started",
+  Processing: "Reading documents",
+  "Needs Review": "Ready to review",
+  Flagged: "Needs attention",
+  Completed: "Finished",
+};
+const statusLabel = (status: string) => STATUS_LABEL[status] ?? status;
 
 function isWithinDays(dateStr: string, days: number): boolean {
   const date = new Date(dateStr);
@@ -73,8 +77,10 @@ export function CasesPage() {
         {/* Page header */}
         <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Case Operations</p>
-            <h1 className="mt-1 text-3xl font-bold tracking-tight">All Cases</h1>
+            <h1 className="text-3xl font-bold tracking-tight">Your cases</h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              One case is one property. Open a case to add its documents, check them and make the report.
+            </p>
           </div>
           <Button size="sm" nativeButton={false} render={<Link href="/cases/new" />}>
             <Plus data-icon="inline-start" />
@@ -86,10 +92,10 @@ export function CasesPage() {
           <CardHeader className="border-b">
             <div className="flex flex-wrap items-center gap-2">
               <div className="relative min-w-[220px] flex-1">
-                <Search className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
-                <Input
+                <KeyboardInput
+                  leadingIcon={<Search className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />}
                   className="h-9 pl-8 text-sm"
-                  placeholder="Search by title or address…"
+                  placeholder="Search by property name or place…"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                 />
@@ -99,12 +105,12 @@ export function CasesPage() {
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
               >
-                <option>All status</option>
-                <option>Draft</option>
-                <option>Processing</option>
-                <option>Needs Review</option>
-                <option>Flagged</option>
-                <option>Completed</option>
+                <option value="All status">All statuses</option>
+                <option value="Draft">{statusLabel("Draft")}</option>
+                <option value="Processing">{statusLabel("Processing")}</option>
+                <option value="Needs Review">{statusLabel("Needs Review")}</option>
+                <option value="Flagged">{statusLabel("Flagged")}</option>
+                <option value="Completed">{statusLabel("Completed")}</option>
               </select>
               <select
                 className="h-9 min-w-[160px] rounded-lg border border-input bg-background px-3 text-sm text-foreground outline-none transition-colors focus:border-ring"
@@ -126,20 +132,30 @@ export function CasesPage() {
             {isError && (
               <p className="p-6 text-sm font-medium text-destructive">Unable to load cases.</p>
             )}
-            {!isLoading && !isError && filteredCases.length === 0 && (
-              <p className="p-6 text-sm text-muted-foreground">No cases match your filters.</p>
+            {!isLoading && !isError && dashboardCases.length === 0 && (
+              <div className="flex flex-col items-center gap-3 px-6 py-14 text-center">
+                <FolderOpen size={28} className="text-muted-foreground" />
+                <p className="text-lg font-semibold">You have no cases yet</p>
+                <p className="max-w-sm text-sm text-muted-foreground">
+                  Start by creating a case for a property. Then you can upload its documents.
+                </p>
+                <Button nativeButton={false} render={<Link href="/cases/new" />}>
+                  <Plus size={15} data-icon="inline-start" />
+                  Create your first case
+                </Button>
+              </div>
+            )}
+            {!isLoading && !isError && dashboardCases.length > 0 && filteredCases.length === 0 && (
+              <p className="p-6 text-sm text-muted-foreground">No cases match what you typed or chose. Clear the search or the filters to see all cases.</p>
             )}
             {!isLoading && !isError && filteredCases.length > 0 && (
               <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead>Case</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Owner</TableHead>
-                    <TableHead>Risk</TableHead>
+                    <TableHead>Where it is</TableHead>
                     <TableHead>Created</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
+                    <TableHead className="text-right"><span className="sr-only">Open</span></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -151,22 +167,10 @@ export function CasesPage() {
                     >
                       <TableCell>
                         <div className="font-medium">{caseItem.title}</div>
-                        <div className="text-xs text-muted-foreground">{caseItem.address}</div>
+                        <div className="text-xs text-muted-foreground">{caseItem.address === "Address N/A" ? "No location added" : caseItem.address}</div>
                       </TableCell>
                       <TableCell>
-                        <Badge variant="secondary">{caseItem.status}</Badge>
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">{caseItem.propertyType}</TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <Avatar size="sm">
-                            <AvatarFallback>{caseItem.assignee.avatar}</AvatarFallback>
-                          </Avatar>
-                          <span className="text-sm">{caseItem.assignee.name}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={riskVariant(caseItem.risk)}>{caseItem.risk}</Badge>
+                        <Badge variant="secondary">{statusLabel(caseItem.status)}</Badge>
                       </TableCell>
                       <TableCell className="text-muted-foreground">{caseItem.createdAt}</TableCell>
                       <TableCell className="text-right">
@@ -178,7 +182,8 @@ export function CasesPage() {
                             openCase(caseItem.id);
                           }}
                         >
-                          <MoreHorizontal size={14} />
+                          Open
+                          <ArrowRight size={14} data-icon="inline-end" />
                         </Button>
                       </TableCell>
                     </TableRow>

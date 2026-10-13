@@ -5,7 +5,7 @@ import { AlertTriangle, BrainCircuit, Ruler } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { KeyboardInput } from "@/components/keyboard/KeyboardField";
 import { useFlagsQuery, useResolveFlagMutation } from "@/services/api/hooks";
 import { useToast } from "@/context/ToastContext";
 import type { FlagRecord, FlagSeverity } from "@/services/api/client";
@@ -93,7 +93,7 @@ export function RiskFlagsPanel({ caseId }: RiskFlagsPanelProps) {
                 </div>
                 <p className="text-sm leading-relaxed text-muted-foreground">{flag.description}</p>
                 <div className="flex flex-wrap items-center gap-2">
-                  <Input
+                  <KeyboardInput
                     placeholder="Resolution note (optional)"
                     value={notesByFlag[flag.id] || ""}
                     onChange={(e) => setNotesByFlag((prev) => ({ ...prev, [flag.id]: e.target.value }))}

@@ -18,8 +18,10 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 # authenticated request failed).
 
 
+# A plain `def`, so FastAPI runs it in the threadpool: password hashing is slow
+# on purpose, and as an `async def` it would stall every other request.
 @router.post("/login", dependencies=[Depends(limit_ip("login", "RATE_LIMIT_LOGIN"))])
-async def login_user(
+def login_user(
     payload: UserLogin,
     db: Client = Depends(get_supabase_service_client),
 ):

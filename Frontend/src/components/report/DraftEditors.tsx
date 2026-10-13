@@ -4,7 +4,7 @@ import React from "react";
 import { Plus, Trash2 } from "lucide-react";
 import type { DraftBlock, DraftField, DraftLoop, DraftSection, ReportDraft } from "@/services/api/client";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { KeyboardInput, KeyboardTextarea } from "@/components/keyboard/KeyboardField";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
@@ -22,15 +22,19 @@ function GrowingTextarea({
   className,
   placeholder,
   ariaLabel,
+  keyboard = false,
 }: {
   value: string;
   onChange: (value: string) => void;
   className?: string;
   placeholder?: string;
   ariaLabel?: string;
+  /** Offer the Marathi keyboard. Left off inside table cells, which are too narrow for it. */
+  keyboard?: boolean;
 }) {
+  const Field = keyboard ? KeyboardTextarea : "textarea";
   return (
-    <textarea
+    <Field
       aria-label={ariaLabel}
       value={value}
       placeholder={placeholder}
@@ -140,7 +144,7 @@ function BlockEditor({ block, onChange }: { block: DraftBlock; onChange: (block:
   if (block.type === "table") {
     return <TableEditor columns={block.columns} rows={block.rows} onChange={(rows) => onChange({ ...block, rows })} />;
   }
-  return <GrowingTextarea ariaLabel="Paragraph" value={block.text} onChange={(text) => onChange({ ...block, text })} />;
+  return <GrowingTextarea keyboard ariaLabel="Paragraph" value={block.text} onChange={(text) => onChange({ ...block, text })} />;
 }
 
 /** Title search report: ordered sections of paragraphs and tables. */
@@ -167,7 +171,7 @@ export function TitleSearchEditor({
     <div className="flex flex-col gap-6">
       <label className="flex flex-col gap-1.5">
         <span className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Report title</span>
-        <Input value={draft.title} onChange={(e) => onChange({ ...draft, title: e.target.value })} className="h-9 text-base font-semibold" />
+        <KeyboardInput value={draft.title} onChange={(e) => onChange({ ...draft, title: e.target.value })} className="h-9 text-base font-semibold" />
       </label>
       {draft.sections.map((section) => (
         <Fold
@@ -175,7 +179,7 @@ export function TitleSearchEditor({
           title={section.heading}
           defaultOpen={!["documents", "extracts", "signature"].includes(section.id)}
         >
-          <Input
+          <KeyboardInput
             aria-label="Section heading"
             value={section.heading}
             onChange={(e) => setHeading(section, e.target.value)}
@@ -211,10 +215,10 @@ function FieldInput({ field, onChange }: { field: DraftField; onChange: (value: 
     );
   }
   if (field.source === "drafted" || field.value.length > 80) {
-    return <GrowingTextarea ariaLabel={field.label} value={field.value} onChange={onChange} className={common} />;
+    return <GrowingTextarea keyboard ariaLabel={field.label} value={field.value} onChange={onChange} className={common} />;
   }
   return (
-    <Input
+    <KeyboardInput
       aria-label={field.label}
       value={field.value}
       onChange={(e) => onChange(e.target.value)}

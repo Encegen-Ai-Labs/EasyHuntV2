@@ -18,10 +18,12 @@ import type { DocumentRecord, ExtractionRecord } from "@/services/api/client";
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/context/ToastContext";
 import { Button } from "@/components/ui/button";
+import { KeyboardInput, KeyboardTextarea } from "@/components/keyboard/KeyboardField";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FormattedText } from "@/components/text/FormattedText";
 import { CaseStepper } from "@/components/case/CaseStepper";
+import { StepGuide } from "@/components/case/StepGuide";
 import { PageHeader } from "@/components/case/PageHeader";
 
 // Keys the extraction prompt (backend/app/services/llm_extractor.py) returns
@@ -289,9 +291,20 @@ export function ReviewPage() {
 
         <CaseStepper caseId={caseId} current="review" />
 
+        <StepGuide
+          id="review"
+          title="Step 2 of 4: check each document, then approve it"
+          steps={[
+            "Pick a document on the left. The original is in the middle and the details we read from it are on the right.",
+            "Compare each detail with the original. If one is wrong, press Edit and correct it (the अ button lets you type in Marathi).",
+            "Press Approve when the document is right. Only approved documents can be searched and used in a report. You can undo an approval later.",
+          ]}
+          note="“Reading confidence” shows how sure the reader was. Low, or handwritten, means look closely."
+        />
+
         <div className="mb-5 flex flex-wrap items-center justify-between gap-3 text-sm">
           <p className="text-muted-foreground">
-            Compare each field with the original and correct anything wrong, then approve.
+            {approvedCount} of {entries.length} approved.
           </p>
           {approvedCount > 0 && (
             <Button nativeButton={false} render={<Link href={`/cases/${caseId}/search`} />}>
@@ -381,8 +394,8 @@ export function ReviewPage() {
               <CardHeader className="border-b">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Extracted Fields</p>
-                    <CardTitle className="mt-1">Diligence Data</CardTitle>
+                    <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Check these against the original</p>
+                    <CardTitle className="mt-1">Details read from this document</CardTitle>
                   </div>
                   {active?.extraction && !active.extraction.reviewed_at && (
                     <Button
@@ -424,16 +437,16 @@ export function ReviewPage() {
                       )}
                       {currentFields.overall_confidence && (
                         <Badge variant={confidenceVariant(currentFields.overall_confidence)}>
-                          Overall: {currentFields.overall_confidence}
+                          Reading confidence: {currentFields.overall_confidence}
                         </Badge>
                       )}
                       {active.extraction.has_handwritten_content && (
-                        <Badge variant="destructive">Handwritten content</Badge>
+                        <Badge variant="destructive" title="Handwriting is harder to read. Check every value against the original.">Handwritten: check carefully</Badge>
                       )}
                       {active.extraction.needs_review && (
-                        <Badge variant="destructive">Needs human review</Badge>
+                        <Badge variant="destructive" title="Every document must be checked by you before it is used.">You must check this</Badge>
                       )}
-                      {cachedNote && <Badge variant="outline">Saved result</Badge>}
+                      {cachedNote && <Badge variant="outline" title="This exact file was read before, so that result was reused.">Reused earlier reading</Badge>}
                     </div>
                     {cachedNote && (
                       <p className="text-xs text-muted-foreground">
@@ -459,7 +472,7 @@ export function ReviewPage() {
                               </div>
                               {isEditingFields ? (
                                 <>
-                                <input
+                                <KeyboardInput
                                   value={displayValue}
                                   onChange={(e) => handleFieldChange(key, e.target.value)}
                                   className="mt-1.5 h-8 w-full rounded-md border border-input bg-transparent px-2 text-sm outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30"
@@ -533,7 +546,7 @@ export function ReviewPage() {
                         </>
                       ) : (
                         <>
-                          <textarea
+                          <KeyboardTextarea
                             placeholder="Review notes (optional)"
                             value={reviewNotes}
                             onChange={(e) => setReviewNotes(e.target.value)}
@@ -638,7 +651,7 @@ export function ReviewPage() {
                       <div>
                         <p className="mb-1 text-xs font-semibold text-muted-foreground">Original</p>
                         {isEditingThisPage ? (
-                          <textarea
+                          <KeyboardTextarea
                             value={editedOriginalText}
                             onChange={(e) => setEditedOriginalText(e.target.value)}
                             className="min-h-[120px] w-full rounded-lg border border-input bg-transparent px-2.5 py-1.5 text-sm outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30"

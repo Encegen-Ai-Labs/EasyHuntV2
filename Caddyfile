@@ -1,0 +1,14 @@
+# One address for the whole app. Browsers talk only to this; no CORS needed.
+# For HTTPS on a real domain, replace ":80" with the domain name (Caddy gets the certificate itself).
+:80 {
+	request_body {
+		max_size 200MB
+	}
+	@backend path /api/* /health /health/*
+	handle @backend {
+		reverse_proxy api:8000
+	}
+	handle {
+		reverse_proxy web:3000
+	}
+}

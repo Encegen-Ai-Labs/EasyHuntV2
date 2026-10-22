@@ -19,6 +19,18 @@ services:
       timeout: 3s
       retries: 10
 
+  # Applies backend/migrations/*.sql (needs DATABASE_URL in backend/.env), then exits.
+  # api and worker start only after it succeeds.
+  migrate:
+    build:
+      context: ./backend
+    env_file:
+      - ./backend/.env
+    command: python -m scripts.migrate
+    restart: "no"
+    mem_limit: 256m
+    logging: *logging
+
   api:
     build:
       context: ./backend
@@ -30,7 +42,7 @@ services:
     restart: unless-stopped
     mem_limit: 2g
     ports:
-      - "8000:8000"
+      - "8000:8000"   # direct access for load tests; the app itself is served by "proxy" on port 80
     environment:
       CELERY_ENABLED: "true"
       CELERY_BROKER_URL: redis://redis:6379/0
@@ -46,6 +58,8 @@ services:
     depends_on:
       redis:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
 
   worker:
     build:
@@ -70,6 +84,32 @@ services:
     depends_on:
       redis:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+
+  # The website (Next.js). Reached only through "proxy".
+  web:
+    build:
+      context: ./Frontend
+    restart: unless-stopped
+    mem_limit: 1g
+    logging: *logging
+
+  # The single public address: / goes to the website, /api/* to the backend.
+  proxy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    mem_limit: 256m
+    ports:
+      - "80:80"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+    logging: *logging
+    depends_on:
+      - api
+      - web
 
 volumes:
   redis-data:
+  caddy-data:

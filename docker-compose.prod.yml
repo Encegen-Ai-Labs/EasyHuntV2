@@ -5,6 +5,14 @@
 # (Caddy or nginx, which also terminates HTTPS) is the only thing that talks to it.
 # Needs Docker Compose 2.24 or newer (for the !override tag).
 services:
+  migrate:
+    image: ${IMAGE}:${IMAGE_TAG}
+    pull_policy: always
+    environment:
+      APP_ENV: production
+  web:
+    image: ${IMAGE_WEB}:${IMAGE_TAG}
+    pull_policy: always
   api:
     image: ${IMAGE}:${IMAGE_TAG}
     pull_policy: always

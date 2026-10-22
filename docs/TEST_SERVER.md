@@ -10,20 +10,25 @@ This is for testing. Production still goes through `docs/CICD.md`.
 
 ## Steps (do these on the machine, e.g. over UltraViewer)
 1. Start Docker and wait until `docker info` works.
-2. `git clone https://github.com/Encegen-Ai-Labs/<repo>.git EasyHuntV2` then `cd EasyHuntV2` and `git checkout dev`
-   (or the branch you want tested; see "Which branch" below).
+2. `git clone https://github.com/Encegen-Ai-Labs/EasyHuntV2.git` then `cd EasyHuntV2` and `git checkout dev`.
 3. Create `backend/.env` from `backend/.env.example` and fill in real values:
    - `SUPABASE_URL`, `SUPABASE_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_JWT_SECRET`
    - `GEMINI_API_KEY` (and `GOOGLE_TRANSLATE_API_KEY` if translating)
    - `APP_JWT_SECRET`: a long random string
-   - `CORS_ORIGINS`: the address the frontend is opened from, e.g. `http://192.168.1.50:3000`
-   - Keep `APP_ENV` as `development` for a test box, or `production` if you want the strict startup checks
-     (it then refuses placeholder secrets and localhost CORS).
-   - Set `DAILY_LLM_BUDGET_USD` low while load testing so a runaway test cannot burn money.
-4. Apply any new `backend/migrations/*.sql` in the Supabase SQL editor, in order (the pipeline does not do this).
-5. `docker compose up -d --build` (first build takes several minutes: LibreOffice + OCR packs).
-6. Check: `docker compose ps` (api healthy), then open `http://localhost:8000/health/ready`; it should say `ok`.
-7. Windows firewall: allow inbound TCP 8000 so teammates can reach `http://<machine-ip>:8000`.
+   - `DATABASE_URL`: Supabase Postgres connection string (Session pooler or Direct). This is what makes
+     migrations automatic. If migrations 0001-0011 were already run by hand, run once:
+     `docker compose run --rm migrate python -m scripts.migrate --baseline 11`
+   - `CORS_ORIGINS` is not needed for the website (same address), only for other callers.
+   - Set `DAILY_LLM_BUDGET_USD` low while load testing.
+4. `docker compose up -d --build` (first build takes several minutes).
+   Order: redis, then `migrate` (applies new `backend/migrations/*.sql`, then exits), then api + worker, web, proxy.
+   If a migration fails, api/worker do not start: read `docker compose logs migrate`.
+5. Open `http://localhost/` (or `http://<machine-ip>/`). One address serves the website and `/api/*`.
+   Backend check: `http://localhost/health/ready` should say `ok`.
+6. Windows firewall: allow inbound TCP 80 (and 8000 if load testing the API directly).
+
+The database's base schema (the `documents` table etc.) is not in the repo: the Supabase project must already have it.
+A migration that fails is rolled back completely and retried on the next start.
 
 ## Load testing
 `cd backend && python scripts/load_test.py --help` (run from any machine that can reach the server).
@@ -44,7 +49,7 @@ The latest work lives on `feature/multiuser-marathi-ui`; open a PR into `dev` (C
 or check that branch out directly on the box for a quick first run.
 
 ## Known gaps before real production
-No automatic migrations (needs the base schema in the repo) and frontend hosting undecided. The base image is pinned to a digest and containers have memory limits (redis 256m, api 2g, worker 4g).
+The base database schema is not in the repo (migrations assume it exists). For HTTPS on a real domain, put the domain in `Caddyfile` instead of `:80`. The base image is pinned to a digest and containers have memory limits (redis 256m, api 2g, worker 4g).
 Dependencies are now pinned in `backend/requirements.lock` (the image installs from it); `requirements.txt` lists what
 we ask for, `requirements-dev.txt` adds pytest for CI. To upgrade a library, edit `requirements.txt`, then regenerate the
 lock inside `python:3.11-slim` with `pip install -r requirements.txt && pip freeze`.

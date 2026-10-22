@@ -21,6 +21,7 @@ concurrency:
 
 env:
   IMAGE: ghcr.io/${{ github.repository_owner }}/easyhunt-backend
+  IMAGE_WEB: ghcr.io/${{ github.repository_owner }}/easyhunt-web
 
 jobs:
   image:
@@ -48,6 +49,14 @@ jobs:
             ${{ env.IMAGE }}:${{ steps.meta.outputs.tag }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+      - uses: docker/build-push-action@v6
+        with:
+          context: Frontend
+          push: true
+          tags: |
+            ${{ env.IMAGE_WEB }}:${{ steps.meta.outputs.tag }}
+          cache-from: type=gha,scope=web
+          cache-to: type=gha,mode=max,scope=web
 
   deploy:
     name: Deploy to ${{ github.ref_name == 'main' && 'production' || 'staging' }}
@@ -83,5 +92,5 @@ jobs:
           printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key && chmod 600 ~/.ssh/deploy_key
           printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
           # Copy the small deploy script and compose file, then run the script on the server.
-          scp -i ~/.ssh/deploy_key deploy/deploy.sh docker-compose.yml docker-compose.prod.yml "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/"
+          scp -i ~/.ssh/deploy_key deploy/deploy.sh docker-compose.yml docker-compose.prod.yml Caddyfile "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/"
           ssh -i ~/.ssh/deploy_key "$DEPLOY_USER@$DEPLOY_HOST" "cd '$DEPLOY_PATH' && IMAGE='${{ env.IMAGE }}' sh deploy.sh '$TAG'"

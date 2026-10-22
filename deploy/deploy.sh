@@ -20,8 +20,8 @@ READY_URL="${READY_URL:-http://127.0.0.1:8000/health/ready}"
 ATTEMPTS="${ATTEMPTS:-40}"   # x 3 seconds = 2 minutes
 
 start() {
-  IMAGE="$IMAGE" IMAGE_TAG="$1" $COMPOSE pull api worker
-  IMAGE="$IMAGE" IMAGE_TAG="$1" $COMPOSE up -d --no-build --remove-orphans
+  IMAGE="$IMAGE" IMAGE_WEB="${IMAGE_WEB:-${IMAGE%-backend}-web}" IMAGE_TAG="$1" $COMPOSE pull migrate api worker web
+  IMAGE="$IMAGE" IMAGE_WEB="${IMAGE_WEB:-${IMAGE%-backend}-web}" IMAGE_TAG="$1" $COMPOSE up -d --no-build --remove-orphans
 }
 
 wait_until_ready() {

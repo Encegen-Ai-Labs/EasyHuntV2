@@ -32,10 +32,10 @@ jobs:
         with:
           python-version: "3.11"
           cache: pip
-          cache-dependency-path: backend/requirements.txt
+          cache-dependency-path: backend/requirements-dev.txt
       - name: System packages (OCR engine the image tests expect)
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends tesseract-ocr tesseract-ocr-eng
-      - run: pip install -r requirements.txt
+      - run: pip install -r requirements-dev.txt
       # Catches code that cannot run: undefined names, duplicate definitions, unused imports.
       - name: Lint (blocks the merge)
         run: pip install ruff && ruff check app scripts --select E9,F63,F7,F82,F811,F401
@@ -138,7 +138,7 @@ jobs:
         with:
           python-version: "3.11"
       - name: Python dependency audit (report only)
-        run: pip install pip-audit && pip-audit -r backend/requirements.txt
+        run: pip install pip-audit && pip-audit -r backend/requirements.lock
         continue-on-error: true
       - name: Node dependency audit (report only)
         run: cd Frontend && npm audit --omit=dev

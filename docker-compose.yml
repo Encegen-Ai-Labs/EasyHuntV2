@@ -9,6 +9,7 @@ services:
   redis:
     image: redis:7-alpine
     restart: unless-stopped
+    mem_limit: 256m
     volumes:
       - redis-data:/data
     logging: *logging
@@ -27,6 +28,7 @@ services:
     # limits and the queue live in Redis, so they are shared between the two.
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2
     restart: unless-stopped
+    mem_limit: 2g
     ports:
       - "8000:8000"
     environment:
@@ -54,10 +56,17 @@ services:
     # in app/tasks/celery_app.py), not from a CLI flag, so the cap always applies.
     command: celery -A app.tasks.celery_app:celery_app worker --loglevel=INFO
     restart: unless-stopped
+    mem_limit: 4g
     environment:
       CELERY_ENABLED: "true"
       CELERY_BROKER_URL: redis://redis:6379/0
     logging: *logging
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A app.tasks.celery_app:celery_app inspect ping -d celery@$$HOSTNAME -t 5"]
+      interval: 60s
+      timeout: 15s
+      retries: 3
+      start_period: 40s
     depends_on:
       redis:
         condition: service_healthy
